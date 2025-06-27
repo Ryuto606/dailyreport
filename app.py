@@ -52,7 +52,7 @@ df = pd.merge(df_form, df_map, on="Email", how="left")
 
 # 日付列など追加
 df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
-df["Date"] = df["Timestamp"].dt.date
+df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 
 # === 不要な列を削除
@@ -65,10 +65,10 @@ cols = df.columns.tolist()
 
 # === 列順を Date → Name → 他 → Timestamp に並べ替え ===
 cols = df.columns.tolist()
-for col in ["Date", "Name", "Timestamp"]:
+for col in ["Date", "Name", "Timestamp", "Email"]:
     if col in cols:
         cols.remove(col)
-new_order = ["Date", "Name"] + cols + ["Timestamp"]
+new_order = ["Date", "Name"] + cols + ["Timestamp", "Email"]
 df = df[new_order]
 
 # ===== UI =====
