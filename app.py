@@ -23,18 +23,18 @@ client = gspread.authorize(credentials)
 
 # ===== スプレッドシートを開く =====
 # ↓ あなたのシートURLに必ず置き換えてください！
-sheet_url = "https://docs.google.com/spreadsheets/d/【スプレッドシートID】/edit"
+sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 
 spreadsheet = client.open_by_url(sheet_url)
 
 # ===== シート読み込み =====
 # ① フォーム回答シート
-worksheet_form = spreadsheet.worksheet("Form Responses 1")
+worksheet_form = spreadsheet.worksheet("フォームの回答 1")
 records_form = worksheet_form.get_all_records()
 df_form = pd.DataFrame(records_form)
 
 # ② メールアドレス ⇨ 氏名対応表シート
-worksheet_map = spreadsheet.worksheet("NameMap")
+worksheet_map = spreadsheet.worksheet("一覧")
 records_map = worksheet_map.get_all_records()
 df_map = pd.DataFrame(records_map)
 
