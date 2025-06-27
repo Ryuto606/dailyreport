@@ -1,80 +1,76 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets_connection import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="通所日報詳細", layout="wide")
-st.title("📝 通所日報ダッシュボード（詳細版）")
+# ===== ページ設定 =====
+st.set_page_config(page_title="通所日報ダッシュボード", layout="wide")
+st.title("📝 通所日報ダッシュボード")
 
-# ===== Google Sheets接続 =====
-conn = st.connection("gsheets", type=GSheetsConnection)
+# ===== Google 認証 =====
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
 
-@st.cache_data(ttl=600)
-def load_data():
-    sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit?resourcekey=&gid=663617233#gid=663617233"
+# Streamlit Cloud の secrets から認証情報を取得
+credentials = Credentials.from_service_account_info(
+    st.secrets["connections"]["gsheets"],
+    scopes=scope
+)
 
-    # 1️⃣ 回答シート
-    df_form = conn.read(
-        worksheet="フォームの回答 1",
-        url=sheet_url
-    )
+client = gspread.authorize(credentials)
 
-    df_form.rename(columns={
-        df_form.columns[0]: "Timestamp",
-        df_form.columns[1]: "Email"
-        # 他は元名のままでOK
-    }, inplace=True)
+# ===== スプレッドシートを開く =====
+# ↓ あなたのシートURLに必ず置き換えてください！
+sheet_url = "https://docs.google.com/spreadsheets/d/【スプレッドシートID】/edit"
 
-    # 2️⃣ 氏名対応表
-    df_map = conn.read(
-        worksheet="一覧",
-        url=sheet_url
-    )
-    df_map.columns = ["Email", "Name"]
+spreadsheet = client.open_by_url(sheet_url)
 
-    # 3️⃣ JOIN
-    df = pd.merge(df_form, df_map, on="Email", how="left")
+# ===== シート読み込み =====
+# ① フォーム回答シート
+worksheet_form = spreadsheet.worksheet("Form Responses 1")
+records_form = worksheet_form.get_all_records()
+df_form = pd.DataFrame(records_form)
 
-    # 4️⃣ 日付/年月
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"])
-    df["Date"] = df["Timestamp"].dt.date
-    df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
+# ② メールアドレス ⇨ 氏名対応表シート
+worksheet_map = spreadsheet.worksheet("NameMap")
+records_map = worksheet_map.get_all_records()
+df_map = pd.DataFrame(records_map)
 
-    # 並べ替え
-    df = df.sort_values("Timestamp", ascending=False)
+# ===== データ前処理 =====
+# カラム整理
+df_form.rename(columns={
+    df_form.columns[0]: "Timestamp",
+    df_form.columns[1]: "Email",
+}, inplace=True)
 
-    return df
+df_map.columns = ["Email", "Name"]
 
-df = load_data()
+# JOIN
+df = pd.merge(df_form, df_map, on="Email", how="left")
 
-# ===== 表示モード =====
-mode = st.radio("表示モード", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
+# 日付列など追加
+df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+df["Date"] = df["Timestamp"].dt.date
+df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
+
+df = df.sort_values("Timestamp", ascending=False)
+
+# ===== UI =====
+mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
 
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
     daily_df = df[df["Date"] == sel_date]
-
-    st.subheader(f"📅 {sel_date} の日報（{len(daily_df)}件）")
-    st.dataframe(
-        daily_df[["Name", "曜日", "起床時間", "睡眠時間", "気分（起床時）",
-                  "良好サイン", "注意サイン", "悪化サイン", "相談・連絡", "Timestamp"]],
-        use_container_width=True
-    )
+    st.subheader(f"📅 {sel_date} の日報（{len(daily_df)} 件）")
+    st.dataframe(daily_df, use_container_width=True)
 
 else:
-    sel_user = st.selectbox("利用者を選択", sorted(df["Name"].dropna().unique()))
-    months = sorted(df["YearMonth"].unique(), reverse=True)
-    sel_month = st.selectbox("月を選択", months)
-
-    user_df = df[(df["Name"] == sel_user) & (df["YearMonth"] == sel_month)]
-
-    st.subheader(f"👤 {sel_user} の {sel_month} の日報（{len(user_df)}件）")
-
-    st.dataframe(
-        user_df[["Date", "曜日", "就寝時間", "起床時間", "睡眠時間", "睡眠の質",
-                 "朝食", "入浴", "服薬", "体温（℃）　※任意",
-                 "気分（起床時）", "オフタイムコントロール [睡眠]", "オフタイムコントロール [食事]",
-                 "オフタイムコントロール [ストレス]", "良好サイン", "注意サイン", "悪化サイン",
-                 "今日の自分の状態の課題は？", "課題の原因はなんですか？", "課題の対処はどうしますか？",
-                 "本日の訓練内容および出席講座（箇条書き）", "今日の目標", "相談・連絡", "Timestamp"]],
-        use_container_width=True
-    )
+    # Name に NaN が含まれている場合があるので dropna
+    names = sorted(df["Name"].dropna().unique())
+    sel_name = st.selectbox("利用者を選択", names)
+    sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].unique(), reverse=True))
+    user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
+    st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
+    st.dataframe(user_df, use_container_width=True)
