@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+from st_aggrid import AgGrid, GridOptionsBuilder
+
 
 # ===== ページ設定 =====
 st.set_page_config(page_title="通所日報ダッシュボード", layout="wide")
@@ -22,9 +24,7 @@ credentials = Credentials.from_service_account_info(
 client = gspread.authorize(credentials)
 
 # ===== スプレッドシートを開く =====
-# ↓ あなたのシートURLに必ず置き換えてください！
 sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
-
 spreadsheet = client.open_by_url(sheet_url)
 
 # ===== シート読み込み =====
@@ -56,17 +56,20 @@ df["Date"] = df["Timestamp"].dt.date
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 
 # === 不要な列を削除
-columns_to_hide = ["ID", "Y列の正確な名前"]
+columns_to_hide = ["名"]
 df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
 
 # === 「名前」を Timestamp の次に移動
 # まず今のカラム順を取得
 cols = df.columns.tolist()
 
-# もし「Name」が存在したら順番を変更
-if "Name" in cols:
-    cols.insert(1, cols.pop(cols.index("Name")))
-    df = df[cols]
+# === 列順を Date → Name → 他 → Timestamp に並べ替え ===
+cols = df.columns.tolist()
+for col in ["Date", "Name", "Timestamp"]:
+    if col in cols:
+        cols.remove(col)
+new_order = ["Date", "Name"] + cols + ["Timestamp"]
+df = df[new_order]
 
 # ===== UI =====
 mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
@@ -77,7 +80,19 @@ if mode == "📅 日付別（全員）":
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
 
     st.subheader(f"📅 {sel_date} の日報（{len(daily_df)} 件）")
-    st.dataframe(daily_df, use_container_width=True)
+
+    gb = GridOptionsBuilder.from_dataframe(daily_df)
+    gb.configure_default_column(editable=False)
+    gb.configure_column("Date", pinned="left")
+    gb.configure_column("Name", pinned="left")
+    gridOptions = gb.build()
+
+    AgGrid(
+        daily_df,
+        gridOptions=gridOptions,
+        height=600,
+        enable_enterprise_modules=True,
+    )
 
 else:
     # Name に NaN が含まれている場合があるので dropna
@@ -88,4 +103,16 @@ else:
     user_df = user_df.sort_values("Timestamp", ascending=True)
 
     st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
-    st.dataframe(user_df, use_container_width=True)
+
+    gb = GridOptionsBuilder.from_dataframe(user_df)
+    gb.configure_default_column(editable=False)
+    gb.configure_column("Date", pinned="left")
+    gb.configure_column("Name", pinned="left")
+    gridOptions = gb.build()
+
+    AgGrid(
+        user_df,
+        gridOptions=gridOptions,
+        height=600,
+        enable_enterprise_modules=True,
+    )
