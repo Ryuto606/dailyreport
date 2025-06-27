@@ -70,7 +70,7 @@ else:
     # Name に NaN が含まれている場合があるので dropna
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
-    sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].unique(), reverse=True))
+    sel_month = st.selectbox("表示する月",    sorted(df["YearMonth"].dropna().unique(), reverse=True))
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
     st.dataframe(user_df, use_container_width=True)
