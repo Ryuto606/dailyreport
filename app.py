@@ -76,7 +76,7 @@ mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤
 
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
-    daily_df = df[df["Date"] == sel_date]
+    daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
 
     st.subheader(f"📅 {sel_date} の日報（{len(daily_df)} 件）")
