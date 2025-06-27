@@ -50,8 +50,9 @@ df_map.columns = ["Email", "Name"]
 # JOIN
 df = pd.merge(df_form, df_map, on="Email", how="left")
 
-# 日付列など追加
+# === 日付列 & 表示用列 ===
 df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+df["Timestamp_str"] = df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
 df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 
@@ -63,55 +64,67 @@ df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
 # まず今のカラム順を取得
 cols = df.columns.tolist()
 
-# === 列順を Date → Name → 他 → Timestamp に並べ替え ===
+# === 列順: Timestamp_str → Name → 他 → Email ===
 cols = df.columns.tolist()
-for col in ["Date", "Name", "Timestamp", "Email"]:
+for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
     if col in cols:
         cols.remove(col)
-new_order = ["Date", "Name"] + cols + ["Timestamp", "Email"]
+new_order = ["Timestamp_str", "Name"] + cols + ["Email", "Timestamp"]
 df = df[new_order]
 
+# ===== UI =====
 # ===== UI =====
 mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
 
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
+
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
 
-    st.subheader(f"📅 {sel_date} の日報（{len(daily_df)} 件）")
+    # 表示用: Timestamp は除外
+    display_df = daily_df.drop(columns=["Timestamp"])
 
-    gb = GridOptionsBuilder.from_dataframe(daily_df)
+    st.subheader(f"📅 {sel_date} の日報（{len(display_df)} 件）")
+
+    gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(editable=False)
-    gb.configure_column("Date", pinned="left")
+    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", pinned="left")
     gridOptions = gb.build()
 
     AgGrid(
-        daily_df,
+        display_df,
         gridOptions=gridOptions,
         height=600,
         enable_enterprise_modules=True,
     )
 
 else:
-    # Name に NaN が含まれている場合があるので dropna
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
-    sel_month = st.selectbox("表示する月",    sorted(df["YearMonth"].dropna().unique(), reverse=False))
+
+    sel_month = st.selectbox(
+        "表示する月",
+        sorted(df["YearMonth"].dropna().unique())
+    )
+
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
 
-    st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
+    # 表示用: Timestamp は除外
+    display_user_df = user_df.drop(columns=["Timestamp"])
 
-    gb = GridOptionsBuilder.from_dataframe(user_df)
+    st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(display_user_df)} 件）")
+
+    gb = GridOptionsBuilder.from_dataframe(display_user_df)
     gb.configure_default_column(editable=False)
-    gb.configure_column("Date", pinned="left")
+    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", pinned="left")
     gridOptions = gb.build()
 
     AgGrid(
-        user_df,
+        display_user_df,
         gridOptions=gridOptions,
         height=600,
         enable_enterprise_modules=True,
