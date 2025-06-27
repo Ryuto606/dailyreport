@@ -57,6 +57,19 @@ df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 
 df = df.sort_values("Timestamp", ascending=False)
 
+# === 不要な列を削除
+columns_to_hide = ["ID", "Y列の正確な名前"]
+df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
+
+# === 「名前」を Timestamp の次に移動
+# まず今のカラム順を取得
+cols = df.columns.tolist()
+
+# もし「Name」が存在したら順番を変更
+if "Name" in cols:
+    cols.insert(1, cols.pop(cols.index("Name")))
+    df = df[cols]
+
 # ===== UI =====
 mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
 
@@ -70,7 +83,7 @@ else:
     # Name に NaN が含まれている場合があるので dropna
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
-    sel_month = st.selectbox("表示する月",    sorted(df["YearMonth"].dropna().unique(), reverse=True))
+    sel_month = st.selectbox("表示する月",    sorted(df["YearMonth"].dropna().unique(), reverse=False))
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
     st.dataframe(user_df, use_container_width=True)
