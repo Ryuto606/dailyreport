@@ -55,8 +55,6 @@ df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 df["Date"] = df["Timestamp"].dt.date
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 
-df = df.sort_values("Timestamp", ascending=False)
-
 # === 不要な列を削除
 columns_to_hide = ["ID", "Y列の正確な名前"]
 df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
@@ -76,6 +74,8 @@ mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
     daily_df = df[df["Date"] == sel_date]
+    daily_df = daily_df.sort_values("Timestamp", ascending=True)
+
     st.subheader(f"📅 {sel_date} の日報（{len(daily_df)} 件）")
     st.dataframe(daily_df, use_container_width=True)
 
@@ -85,5 +85,7 @@ else:
     sel_name = st.selectbox("利用者を選択", names)
     sel_month = st.selectbox("表示する月",    sorted(df["YearMonth"].dropna().unique(), reverse=False))
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
+    user_df = user_df.sort_values("Timestamp", ascending=True)
+
     st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(user_df)} 件）")
     st.dataframe(user_df, use_container_width=True)
