@@ -3,6 +3,9 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from st_aggrid import AgGrid, GridOptionsBuilder
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import altair as alt
 
 
 # ===== ページ設定 =====
@@ -55,6 +58,16 @@ df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 df["Timestamp_str"] = df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
 df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
+df["Weekday"] = df["Timestamp"].dt.day_name()
+
+# === 起床・就寝時間を datetime に変換（前日跨ぎは簡易）
+df["起床時間_dt"] = pd.to_datetime(df["起床時間"], format="%H:%M", errors="coerce")
+df["就寝時間_dt"] = pd.to_datetime(df["就寝時間"], format="%H:%M", errors="coerce")
+
+# === 睡眠時間（時間単位）
+df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
+# もしマイナスなら24h足す
+df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
 
 # === 不要な列を削除
 columns_to_hide = ["名"]
@@ -73,16 +86,16 @@ new_order = ["Timestamp_str", "Name"] + cols + ["Email", "Timestamp"]
 df = df[new_order]
 
 # ===== UI =====
-# ===== UI =====
-mode = st.radio("表示モードを選択", ["📅 日付別（全員）", "👤 利用者別（月別）"], horizontal=True)
+mode = st.radio(
+    "表示モードを選択",
+    ["📅 日付別（全員）", "👤 利用者別（月別）", "📊 人ごと分析"],
+    horizontal=True
+)
 
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
-
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
-
-    # 表示用: Timestamp は除外
     display_df = daily_df.drop(columns=["Timestamp"])
 
     st.subheader(f"📅 {sel_date} の日報（{len(display_df)} 件）")
@@ -100,10 +113,9 @@ if mode == "📅 日付別（全員）":
         enable_enterprise_modules=True,
     )
 
-else:
+elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
-
     sel_month = st.selectbox(
         "表示する月",
         sorted(df["YearMonth"].dropna().unique())
@@ -111,8 +123,6 @@ else:
 
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
-
-    # 表示用: Timestamp は除外
     display_user_df = user_df.drop(columns=["Timestamp"])
 
     st.subheader(f"👤 {sel_name} の {sel_month} の日報（{len(display_user_df)} 件）")
@@ -129,3 +139,75 @@ else:
         height=600,
         enable_enterprise_modules=True,
     )
+
+else:
+    names = sorted(df["Name"].dropna().unique())
+    sel_name = st.selectbox("分析対象を選択", names)
+    person_df = df[df["Name"] == sel_name]
+
+    st.subheader(f"📊 {sel_name} の人ごと分析")
+
+    # === 1️⃣ 月ごとの通所回数
+    st.markdown("### 📅 月ごとの通所回数")
+    month_counts = person_df.groupby("YearMonth").size().reset_index(name="Count")
+    st.bar_chart(month_counts.set_index("YearMonth"))
+
+    # === 曜日ヒートマップ（例）
+    st.markdown("### 📅 曜日別の出席傾向")
+    weekday_counts = (
+        person_df.groupby(["YearMonth", "Weekday"])
+        .size()
+        .reset_index(name="Count")
+    )
+    heatmap = alt.Chart(weekday_counts).mark_rect().encode(
+        x=alt.X('Weekday:N', sort=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]),
+        y='YearMonth:N',
+        color='Count:Q'
+    )
+    st.altair_chart(heatmap, use_container_width=True)
+
+    # === 2️⃣ 生活リズム
+    st.markdown("### ⏰ 起床時間・就寝時間 平均とばらつき")
+    起床平均 = person_df["起床時間_dt"].dt.hour.mean()
+    起床std = person_df["起床時間_dt"].dt.hour.std()
+    st.metric("平均起床時間 (時)", f"{起床平均:.2f}")
+    st.metric("起床時間のばらつき (時)", f"{起床std:.2f}")
+
+    st.markdown("### 💤 睡眠時間の推移")
+    sleep_df = person_df[["Date", "睡眠時間_h"]].dropna().drop_duplicates("Date")
+    st.line_chart(sleep_df.set_index("Date"))
+
+    # === 4️⃣ WordCloud
+    st.markdown("### 🎯 目標・課題 WordCloud")
+    texts = (
+        person_df["今日の目標"].dropna().tolist()
+        + person_df["課題の対処はどうしますか？"].dropna().tolist()
+    )
+    text_all = " ".join(texts)
+
+    if text_all.strip():
+        wc = WordCloud(background_color="white", font_path=None, width=800, height=400).generate(text_all)
+        fig, ax = plt.subplots()
+        ax.imshow(wc, interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
+    else:
+        st.info("データが不足しています。")
+
+    # === 6️⃣ オフタイム
+    st.markdown("### 🌙 オフタイム自己管理度の推移")
+    off_cols = [
+        "オフタイムコントロール [睡眠]",
+        "オフタイムコントロール [食事]",
+        "オフタイムコントロール [ストレス]",
+    ]
+    off_df = person_df[["Date"] + off_cols].dropna()
+    off_df = off_df.groupby("Date")[off_cols].mean().reset_index()
+    st.line_chart(off_df.set_index("Date"))
+
+    # === 相談・連絡 「なし」以外
+    st.markdown("### 📌 相談・連絡（『なし』以外）")
+    contact_df = person_df[
+        person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
+    ]
+    st.dataframe(contact_df[["Date", "相談・連絡"]])
