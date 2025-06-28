@@ -207,7 +207,7 @@ else:
     if text_all.strip():
         wc = WordCloud(
             background_color="white",
-            font_path="/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            font_path="./fonts/NotoSansJP-Regular.ttf",
             width=800,
             height=400
         ).generate(text_all)
