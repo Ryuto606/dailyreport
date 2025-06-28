@@ -19,27 +19,20 @@ credentials = Credentials.from_service_account_info(
 )
 client = gspread.authorize(credentials)
 
-# ===== 通所スプレッドシート =====
+# ===== スプレッドシート読み込み =====
 sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 spreadsheet = client.open_by_url(sheet_url)
-
 worksheet_form = spreadsheet.worksheet("フォームの回答 1")
-records_form = worksheet_form.get_all_records()
-df_form = pd.DataFrame(records_form)
+df_form = pd.DataFrame(worksheet_form.get_all_records())
 
 worksheet_map = spreadsheet.worksheet("一覧")
-records_map = worksheet_map.get_all_records()
-df_map = pd.DataFrame(records_map)
+df_map = pd.DataFrame(worksheet_map.get_all_records())
 
-# ===== 退所スプレッドシート =====
 sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
+df_exit = pd.DataFrame(spreadsheet_exit.worksheet("Sheet1").get_all_records())
 
-worksheet_exit = spreadsheet_exit.worksheet("Sheet1")
-records_exit = worksheet_exit.get_all_records()
-df_exit = pd.DataFrame(records_exit)
-
-# ===== 通所前処理 =====
+# ===== 前処理 =====
 df_form.rename(columns={df_form.columns[0]: "Timestamp", df_form.columns[1]: "Email"}, inplace=True)
 df_map.columns = ["Email", "Name"]
 
@@ -48,8 +41,8 @@ df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 df["Timestamp_str"] = df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
 df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
-df["Weekday"] = df["Timestamp"].dt.day_name()
 
+# 就寝・起床
 def parse_time(val):
     try:
         if isinstance(val, str):
@@ -66,12 +59,6 @@ df["就寝時間_dt"] = df["就寝時間"].apply(parse_time)
 df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
 df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
 
-cols = df.columns.tolist()
-for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
-    if col in cols:
-        cols.remove(col)
-df = df[["Timestamp_str", "Name"] + cols + ["Email", "Timestamp"]]
-
 # ===== 退所前処理 =====
 df_exit.rename(columns={df_exit.columns[0]: "Timestamp", df_exit.columns[1]: "Email"}, inplace=True)
 df_exit = pd.merge(df_exit, df_map, on="Email", how="left")
@@ -80,59 +67,29 @@ df_exit["Timestamp_str"] = df_exit["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
 df_exit["Date"] = df_exit["Timestamp"].dt.strftime("%Y-%m-%d")
 df_exit["YearMonth"] = df_exit["Timestamp"].dt.strftime("%Y-%m")
 
-cols_exit = df_exit.columns.tolist()
-for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
-    if col in cols_exit:
-        cols_exit.remove(col)
-df_exit = df_exit[["Timestamp_str", "Name"] + cols_exit + ["Email", "Timestamp"]]
-
-# ===== 表示対象列 =====
+# ===== 表示する列 =====
 show_cols = [
-    "Timestamp_str", "Name", "Date", "Weekday",
-    "就寝時間", "起床時間", "睡眠時間", "睡眠の質", "朝食",
-    "入浴", "服薬", "体温（℃）　※任意",
-    "気分（起床時）",
-    "睡眠", "食事", "ストレス",
+    "Timestamp_str", "Name", "曜日", "就寝時間", "起床時間", "睡眠時間",
+    "睡眠の質", "朝食", "入浴", "服薬", "体温（℃）", "気分（起床時）",
+    "オフタイムコントロール [睡眠]", "オフタイムコントロール [食事]", "オフタイムコントロール [ストレス]",
     "良好サイン", "注意サイン", "悪化サイン",
     "今日の自分の状態の課題は？", "課題の原因はなんですか？", "課題の対処はどうしますか？",
-    "本日の訓練内容および出席講座（箇条書き）",
-    "今日の目標",
-    "相談・連絡"
+    "本日の訓練内容および出席講座（箇条書き）", "今日の目標", "相談・連絡"
 ]
 
-# ===== 表示用ヘッダ名マッピング =====
 header_map = {
     "Timestamp_str": "Timestamp",
-    "Name": "氏名",
-    "Date": "日付",
-    "Weekday": "曜日",
-    "就寝時間": "就寝時間",
-    "起床時間": "起床時間",
-    "睡眠時間": "睡眠時間",
-    "睡眠の質": "睡眠の質",
-    "朝食": "朝食",
-    "入浴": "入浴",
-    "服薬": "服薬",
-    "体温（℃）　※任意": "体温",
-    "気分（起床時）": "気分",
-    "睡眠": "睡眠",
-    "食事": "食事",
-    "ストレス": "ストレス",
-    "良好サイン": "良好サイン",
-    "注意サイン": "注意サイン",
-    "悪化サイン": "悪化サイン",
-    "今日の自分の状態の課題は？": "課題",
-    "課題の原因はなんですか？": "課題の原因",
-    "課題の対処はどうしますか？": "課題の対処",
-    "本日の訓練内容および出席講座（箇条書き）": "訓練内容",
-    "今日の目標": "今日の目標",
-    "相談・連絡": "相談・連絡"
+    "Name": "名前",
+    "曜日": "曜日",
+    "オフタイムコントロール [睡眠]": "睡眠",
+    "オフタイムコントロール [食事]": "食事",
+    "オフタイムコントロール [ストレス]": "ストレス",
 }
 
 # ===== UI =====
 mode = st.radio(
     "表示モードを選択",
-    ["📅 日付別（全員）", "👤 利用者別（月別）", "📊 利用者分析"],
+    ["📅 日付別（全員）", "👤 利用者別（月別）"],
     horizontal=True
 )
 
@@ -140,67 +97,59 @@ if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
-    available_cols = [c for c in show_cols if c in daily_df.columns]
-    display_df = daily_df[available_cols]
+    display_df = daily_df[[c for c in show_cols if c in daily_df.columns]]
 
     st.subheader(f"📅 {sel_date} 【通所日報】（{len(display_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_df)
-    gb.configure_default_column(editable=False)
-    for col in available_cols:
+    gb.configure_default_column(
+        editable=False,
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
+    for col in display_df.columns:
         gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_df, gridOptions=gb.build(), height=600)
 
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")]
     exit_df = exit_df.sort_values("Timestamp", ascending=True)
-    display_exit_df = exit_df.drop(columns=["Timestamp"])
-
-    st.subheader(f"📅 {sel_date} 【退所日報】（{len(display_exit_df)} 件）")
-    gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
-    gb_exit.configure_default_column(editable=False)
+    st.subheader(f"📅 {sel_date} 【退所日報】（{len(exit_df)} 件）")
+    gb_exit = GridOptionsBuilder.from_dataframe(exit_df)
+    gb_exit.configure_default_column(editable=False, wrapText=True, autoHeight=True)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
-    AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=400)
+    AgGrid(exit_df, gridOptions=gb_exit.build(), height=600)
 
 elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
     sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].dropna().unique()))
 
-    user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
-    user_df = user_df.sort_values("Timestamp", ascending=True)
-
-    # ✅ 表示は show_cols ベース・Date は表示しない
-    available_cols = [c for c in show_cols if c in user_df.columns]
-    available_cols = [c for c in available_cols if c != "Date"]
-    display_user_df = user_df[available_cols]
+    user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)].sort_values("Timestamp")
+    display_user_df = user_df[[c for c in show_cols if c in user_df.columns and c != "Date"]]
 
     st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(display_user_df)} 件）")
-
     gb = GridOptionsBuilder.from_dataframe(display_user_df)
-    gb.configure_default_column(editable=False)
-
-    for col in available_cols:
+    gb.configure_default_column(
+        editable=False,
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
+    for col in display_user_df.columns:
         gb.configure_column(col, header_name=header_map.get(col, col))
-        if col == "睡眠時間":
-            gb.configure_column(col, maxWidth=80)
-        if col == "今日の目標":
-            gb.configure_column(
-                col,
-                tooltipField=col,
-                wrapText=True,
-                autoHeight=True,
-                cellStyle={'whiteSpace': 'normal'}
-            )
     AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
-    user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)]
-    user_exit_df = user_exit_df.sort_values("Timestamp", ascending=True)
+    user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)].sort_values("Timestamp")
     st.subheader(f"👤 {sel_name} {sel_month} 【退所日報】（{len(user_exit_df)} 件）")
-    gb_exit = GridOptionsBuilder.from_dataframe(user_exit_df.drop(columns=["Timestamp"]))
-    gb_exit.configure_default_column(editable=False)
+    gb_exit = GridOptionsBuilder.from_dataframe(user_exit_df)
+    gb_exit.configure_default_column(editable=False, wrapText=True, autoHeight=True)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
-    AgGrid(user_exit_df.drop(columns=["Timestamp"]), gridOptions=gb_exit.build(), height=400)
+    AgGrid(user_exit_df, gridOptions=gb_exit.build(), height=600)
+
 
 else:
     names = sorted(df["Name"].dropna().unique())
