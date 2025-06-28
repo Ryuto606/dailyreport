@@ -53,11 +53,11 @@ df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 df["Weekday"] = df["Timestamp"].dt.day_name()
 
-# ✅ 起床・就寝時間をシリアル値or文字列両対応
+# === 起床・就寝時間を シリアル値 or 文字列 両対応でパース
 def parse_time(val):
     try:
         if isinstance(val, str):
-            return pd.to_datetime(val, format="%H:%M", errors="coerce")
+            return pd.to_datetime(val, format="%H:%M:%S", errors="coerce")
         elif isinstance(val, (int, float)):
             return pd.to_datetime("1899-12-30") + pd.to_timedelta(val, unit="D")
         else:
@@ -67,6 +67,7 @@ def parse_time(val):
 
 df["起床時間_dt"] = df["起床時間"].apply(parse_time)
 df["就寝時間_dt"] = df["就寝時間"].apply(parse_time)
+
 
 df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
 df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
