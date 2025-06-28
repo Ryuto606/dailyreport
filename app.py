@@ -105,18 +105,29 @@ if mode == "📅 日付別（全員）":
 
     st.subheader(f"📅 {sel_date} 【通所日報】（{len(display_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_df)
-    gb.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
+    gb.configure_default_column(
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
     for col in display_df.columns:
         gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_df, gridOptions=gb.build(), height=600)
 
+    # ✅ 退所日報の不要列を除外し、Timestamp_strだけ残す
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
-    st.subheader(f"📅 {sel_date} 【退所日報】（{len(exit_df)} 件）")
-    gb_exit = GridOptionsBuilder.from_dataframe(exit_df)
+    display_exit_df = exit_df.drop(
+        columns=["Timestamp", "Email", "Date", "YearMonth"],
+        errors="ignore"
+    )
+
+    st.subheader(f"📅 {sel_date} 【退所日報】（{len(display_exit_df)} 件）")
+    gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
     gb_exit.configure_default_column(wrapText=True, autoHeight=True)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
-    AgGrid(exit_df, gridOptions=gb_exit.build(), height=600)
+    AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
 
 elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
