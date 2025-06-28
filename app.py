@@ -170,11 +170,22 @@ else:
     st.metric("平均就寝時間", sec2hm(bed_sec.mean()))
     st.metric("就寝時間のばらつき (分)", f"{bed_sec.std()/60:.1f}")
 
-    st.markdown("### 相談・連絡")
+    # === 📌 相談・連絡 ===
+    st.markdown("### 📌 相談・連絡（通所）")
     contact_df = person_df[
-        person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
+        person_df["相談・連絡"].notna() & (person_df["相談・連絡"].str.strip() != "なし")
     ]
     st.dataframe(contact_df[["Date", "相談・連絡"]])
+
+    st.markdown("### 🗂 その他（退所）")
+    contact_exit_df = df_exit[
+        (df_exit["Name"] == sel_name) &
+        df_exit["その他"].notna() & (df_exit["その他"].str.strip() != "なし")
+    ]
+    if not contact_exit_df.empty:
+        st.dataframe(contact_exit_df[["Date", "その他"]])
+    else:
+        st.info("退所日報の『その他』には有効な入力がありません。")
 
     st.markdown("### 目標・課題 WordCloud")
     texts = (
