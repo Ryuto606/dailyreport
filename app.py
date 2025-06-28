@@ -109,6 +109,11 @@ if mode == "📅 日付別（全員）":
     gb.configure_default_column(editable=False)
     gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", pinned="left")
+    gb.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
+    gb.configure_column("オフタイムコントロール [食事]", header_name="食事")
+    gb.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
+    gb.configure_column("今日の目標",header_name="今日の目標",
+        cellStyle={'whiteSpace': 'normal', 'lineHeight': '1.4em'})
     AgGrid(display_df, gridOptions=gb.build(), height=400)
 
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")]
@@ -120,6 +125,9 @@ if mode == "📅 日付別（全員）":
     gb_exit.configure_default_column(editable=False)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
+    gb_exit.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
+    gb_exit.configure_column("オフタイムコントロール [食事]", header_name="食事")
+    gb_exit.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
     AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=400)
 
 elif mode == "👤 利用者別（月別）":
@@ -134,6 +142,11 @@ elif mode == "👤 利用者別（月別）":
     gb.configure_default_column(editable=False)
     gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", pinned="left")
+    gb.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
+    gb.configure_column("オフタイムコントロール [食事]", header_name="食事")
+    gb.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
+    gb.configure_column("今日の目標",header_name="今日の目標",
+        cellStyle={'whiteSpace': 'normal', 'lineHeight': '1.4em'})
     AgGrid(user_df.drop(columns=["Timestamp"]), gridOptions=gb.build(), height=400)
 
     user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)]
@@ -143,6 +156,9 @@ elif mode == "👤 利用者別（月別）":
     gb_exit.configure_default_column(editable=False)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
+    gb_exit.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
+    gb_exit.configure_column("オフタイムコントロール [食事]", header_name="食事")
+    gb_exit.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
     AgGrid(user_exit_df.drop(columns=["Timestamp"]), gridOptions=gb_exit.build(), height=400)
 
 else:
