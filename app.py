@@ -100,6 +100,8 @@ if mode == "📅 日付別（全員）":
         "表示する日付",
         value=today_jst
     )
+
+    # ===== 通所日報 =====
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
     display_df = daily_df[[c for c in show_cols if c in daily_df.columns]]
 
@@ -111,23 +113,34 @@ if mode == "📅 日付別（全員）":
         autoHeight=True,
         cellStyle={'whiteSpace': 'normal'}
     )
+    # ✅ 通所: Timestamp_str と Name を左固定
+    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
+    gb.configure_column("Name", header_name="名前", pinned="left")
     for col in display_df.columns:
-        gb.configure_column(col, header_name=header_map.get(col, col))
+        if col not in ["Timestamp_str", "Name"]:
+            gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_df, gridOptions=gb.build(), height=600)
 
-    # ✅ 退所日報の不要列を除外し、Timestamp_strだけ残す
+    # ===== 退所日報 =====
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
     display_exit_df = exit_df.drop(
         columns=["Timestamp", "Email", "Date", "YearMonth"],
         errors="ignore"
     )
 
+    # ✅ 列順を Timestamp_str → Name → その他 に並べ替え
+    exit_cols = display_exit_df.columns.tolist()
+    exit_cols = [c for c in exit_cols if c not in ["Timestamp_str", "Name"]]
+    exit_cols = ["Timestamp_str", "Name"] + exit_cols
+    display_exit_df = display_exit_df[exit_cols]
+
     st.subheader(f"📅 {sel_date} 【退所日報】（{len(display_exit_df)} 件）")
     gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
     gb_exit.configure_default_column(wrapText=True, autoHeight=True)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
-    gb_exit.configure_column("Name", pinned="left")
+    gb_exit.configure_column("Name", header_name="名前", pinned="left")
     AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
+
 
 elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
