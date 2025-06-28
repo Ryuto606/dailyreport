@@ -9,7 +9,7 @@ import altair as alt
 
 # ===== ページ設定 =====
 st.set_page_config(page_title="通所日報ダッシュボード", layout="wide")
-st.title("📝 通所日報ダッシュボード（完全版）")
+st.title("📝 通所日報ダッシュボード（完全最新版）")
 
 # ===== Google 認証 =====
 scope = [
@@ -53,9 +53,9 @@ df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 df["Weekday"] = df["Timestamp"].dt.day_name()
 
-# 起床・就寝時間の整形
-df["起床時間"] = df["起床時間"].astype(str).str.zfill(5)
-df["就寝時間"] = df["就寝時間"].astype(str).str.zfill(5)
+# 起床・就寝時間：文字列化 → 時間形式
+df["起床時間"] = df["起床時間"].astype(str).str.strip().str.zfill(5)
+df["就寝時間"] = df["就寝時間"].astype(str).str.strip().str.zfill(5)
 
 df["起床時間_dt"] = pd.to_datetime(df["起床時間"], format="%H:%M", errors="coerce")
 df["就寝時間_dt"] = pd.to_datetime(df["就寝時間"], format="%H:%M", errors="coerce")
@@ -155,10 +155,15 @@ else:
     st.altair_chart(heatmap, use_container_width=True)
 
     st.markdown("### ⏰ 起床時間・就寝時間 平均とばらつき")
-    起床平均 = person_df["起床時間_dt"].dt.hour.mean()
-    起床std = person_df["起床時間_dt"].dt.hour.std()
-    st.metric("平均起床時間 (時)", f"{起床平均:.2f}")
-    st.metric("起床時間のばらつき (時)", f"{起床std:.2f}")
+    valid_wakeup = person_df["起床時間_dt"].dropna()
+    seconds = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60
+    avg_sec = seconds.mean()
+    std_sec = seconds.std()
+    avg_hour = avg_sec / 3600 if pd.notna(avg_sec) else None
+    std_hour = std_sec / 3600 if pd.notna(std_sec) else None
+
+    st.metric("平均起床時間 (時)", f"{avg_hour:.2f}" if avg_hour else "データなし")
+    st.metric("起床時間のばらつき (時)", f"{std_hour:.2f}" if std_hour else "データなし")
 
     st.markdown("### 💤 睡眠時間の推移")
     sleep_df = person_df[["Date", "睡眠時間_h"]].dropna().drop_duplicates("Date")
