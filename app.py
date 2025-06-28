@@ -12,11 +12,7 @@ st.set_page_config(page_title="通所・退所日報ダッシュボード", layo
 st.title("📝 通所・退所日報ダッシュボード")
 
 # ===== Google 認証 =====
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
+scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(
     st.secrets["connections"]["gsheets"],
     scopes=scope
@@ -90,6 +86,13 @@ for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
         cols_exit.remove(col)
 df_exit = df_exit[["Timestamp_str", "Name"] + cols_exit + ["Email", "Timestamp"]]
 
+# ✅ 通所表示は相談・連絡までに限定
+show_cols = [
+    col for col in df.columns
+    if col in ["Timestamp_str", "Name"] or col == "相談・連絡" or not col.startswith("Email") and col != "Timestamp"
+]
+# show_cols を適切に制御（「相談・連絡」まで必要な場合は手動で順序を調整）
+
 # ===== UI =====
 mode = st.radio(
     "表示モードを選択",
@@ -102,18 +105,13 @@ if mode == "📅 日付別（全員）":
 
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
-    display_df = daily_df.drop(columns=["Timestamp"])
+    display_df = daily_df[show_cols].drop(columns=["Email", "Timestamp"], errors="ignore")
 
     st.subheader(f"📅 {sel_date} 【通所日報】（{len(display_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(editable=False)
     gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", pinned="left")
-    gb.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
-    gb.configure_column("オフタイムコントロール [食事]", header_name="食事")
-    gb.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
-    gb.configure_column("今日の目標",header_name="今日の目標",
-        cellStyle={'whiteSpace': 'normal', 'lineHeight': '1.4em'})
     AgGrid(display_df, gridOptions=gb.build(), height=400)
 
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")]
@@ -125,9 +123,6 @@ if mode == "📅 日付別（全員）":
     gb_exit.configure_default_column(editable=False)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
-    gb_exit.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
-    gb_exit.configure_column("オフタイムコントロール [食事]", header_name="食事")
-    gb_exit.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
     AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=400)
 
 elif mode == "👤 利用者別（月別）":
