@@ -137,42 +137,44 @@ else:
     sel_name = st.selectbox("分析対象", names)
     person_df = df[df["Name"] == sel_name].copy()
 
-    st.subheader(f"📊 {sel_name} さんの分析")
+    st.subheader(f"📊 {sel_name} の分析")
 
     st.markdown("### 月ごとの通所回数")
     st.bar_chart(person_df.groupby("YearMonth").size())
 
-    st.markdown("### 曜日別の出席傾向")
-    heatmap = alt.Chart(
-        person_df.groupby(["YearMonth", "曜日"]).size().reset_index(name="Count")
-    ).mark_rect().encode(
-        x=alt.X('曜日:N'),
-        y='YearMonth:N',
-        color='Count:Q'
-    )
-    st.altair_chart(heatmap, use_container_width=True)
-
     st.markdown("### 起床・就寝時間 平均とばらつき")
     valid_wakeup = person_df["起床時間_dt"].dropna()
-    valid_bed = person_df["就寝時間_dt"].dropna()
-
     wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60
+
+    valid_bed = person_df["就寝時間_dt"].dropna()
     bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60
 
-    bed_sec_adj = [b + 86400 if b < w else b for w, b in zip(wakeup_sec, bed_sec)]
+    # 補正
+    bed_sec_adjusted = []
+    for w, b in zip(wakeup_sec, bed_sec):
+        if b > w:
+            bed_sec_adjusted.append(b)
+        else:
+            bed_sec_adjusted.append(b + 86400)
+    bed_sec = pd.Series(bed_sec_adjusted)
 
     def sec2hm(s):
-        h, m = divmod(int(s) // 60, 60)
+        s = s % 86400
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
         return f"{h:02}:{m:02}"
 
     st.metric("平均起床時間", sec2hm(wakeup_sec.mean()))
-    st.metric("起床時間のばらつき (分)", f"{wakeup_sec.std():.1f}")
+    st.metric("起床時間のばらつき (分)", f"{wakeup_sec.std()/60:.1f}")
 
-    st.metric("平均就寝時間", sec2hm(pd.Series(bed_sec_adj).mean()))
-    st.metric("就寝時間のばらつき (分)", f"{pd.Series(bed_sec_adj).std():.1f}")
+    st.metric("平均就寝時間", sec2hm(bed_sec.mean()))
+    st.metric("就寝時間のばらつき (分)", f"{bed_sec.std()/60:.1f}")
 
-    st.markdown("### 睡眠時間の推移")
-    st.line_chart(person_df[["Date", "睡眠時間_h"]].dropna().set_index("Date"))
+    st.markdown("### 相談・連絡")
+    contact_df = person_df[
+        person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
+    ]
+    st.dataframe(contact_df[["Date", "相談・連絡"]])
 
     st.markdown("### 目標・課題 WordCloud")
     texts = (
@@ -194,10 +196,3 @@ else:
         st.pyplot(fig)
     else:
         st.info("テキストが不足しています（すべて『なし』か空です）。")
-
-    st.markdown("### 📌 相談・連絡")
-    contact_df = person_df[
-        person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
-    ]
-    st.dataframe(contact_df[["Date", "相談・連絡"]])
-
