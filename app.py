@@ -117,7 +117,7 @@ elif mode == "👤 利用者別（月別）":
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)].sort_values("Timestamp")
     display_user_df = user_df[[c for c in show_cols if c in user_df.columns and c != "Date"]]
 
-    st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(display_user_df)} 件）")
+    st.subheader(f"👤 {sel_name} さん {sel_month} 【通所日報】（{len(display_user_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_user_df)
     gb.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
     for col in display_user_df.columns:
@@ -133,15 +133,16 @@ elif mode == "👤 利用者別（月別）":
     AgGrid(user_exit_df, gridOptions=gb_exit.build(), height=600)
 
 else:
-    sel_name = st.selectbox("分析対象", sorted(df["Name"].dropna().unique()))
+    names = sorted(df["Name"].dropna().unique())
+    sel_name = st.selectbox("分析対象", names)
     person_df = df[df["Name"] == sel_name].copy()
 
-    st.subheader(f"📊 {sel_name} の分析")
+    st.subheader(f"📊 {sel_name} さんの分析")
 
     st.markdown("### 月ごとの通所回数")
     st.bar_chart(person_df.groupby("YearMonth").size())
 
-    st.markdown("### 曜日別の出席傾向（日本語）")
+    st.markdown("### 曜日別の出席傾向")
     heatmap = alt.Chart(
         person_df.groupby(["YearMonth", "曜日"]).size().reset_index(name="Count")
     ).mark_rect().encode(
@@ -152,31 +153,51 @@ else:
     st.altair_chart(heatmap, use_container_width=True)
 
     st.markdown("### 起床・就寝時間 平均とばらつき")
-    wakeup_sec = person_df["起床時間_dt"].dropna().dt.hour * 3600 + person_df["起床時間_dt"].dropna().dt.minute * 60
-    bed_sec = person_df["就寝時間_dt"].dropna().dt.hour * 3600 + person_df["就寝時間_dt"].dropna().dt.minute * 60
-    bed_sec_adj = [b+86400 if b < w else b for w, b in zip(wakeup_sec, bed_sec)]
+    valid_wakeup = person_df["起床時間_dt"].dropna()
+    valid_bed = person_df["就寝時間_dt"].dropna()
 
-    def sec2hm(s): h, m = divmod(int(s)//60, 60); return f"{h:02}:{m:02}"
+    wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60
+    bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60
+
+    bed_sec_adj = [b + 86400 if b < w else b for w, b in zip(wakeup_sec, bed_sec)]
+
+    def sec2hm(s):
+        h, m = divmod(int(s) // 60, 60)
+        return f"{h:02}:{m:02}"
+
     st.metric("平均起床時間", sec2hm(wakeup_sec.mean()))
+    st.metric("起床時間のばらつき (分)", f"{wakeup_sec.std():.1f}")
+
     st.metric("平均就寝時間", sec2hm(pd.Series(bed_sec_adj).mean()))
+    st.metric("就寝時間のばらつき (分)", f"{pd.Series(bed_sec_adj).std():.1f}")
 
     st.markdown("### 睡眠時間の推移")
     st.line_chart(person_df[["Date", "睡眠時間_h"]].dropna().set_index("Date"))
 
     st.markdown("### 目標・課題 WordCloud")
     texts = (
-        person_df["今日の目標"].dropna().tolist() + person_df["課題の対処はどうしますか？"].dropna().tolist()
+        person_df["今日の目標"].dropna().tolist()
+        + person_df["課題の対処はどうしますか？"].dropna().tolist()
     )
-    texts = [t for t in texts if t.strip() and t != "なし"]
+    texts = [t for t in texts if str(t).strip() and str(t).strip() != "なし"]
     text_all = " ".join(texts)
-    if text_all:
-        wc = WordCloud(background_color="white", font_path="./fonts/NotoSansJP-Regular.ttf", width=800, height=400).generate(text_all)
+    if text_all.strip():
+        wc = WordCloud(
+            background_color="white",
+            font_path="./fonts/NotoSansJP-Regular.ttf",
+            width=800,
+            height=400
+        ).generate(text_all)
         fig, ax = plt.subplots()
         ax.imshow(wc, interpolation="bilinear")
         ax.axis("off")
         st.pyplot(fig)
     else:
-        st.info("テキストが不足しています。")
+        st.info("テキストが不足しています（すべて『なし』か空です）。")
 
     st.markdown("### 📌 相談・連絡")
-    st.dataframe(person_df[person_df["相談・連絡"].notna()][["Date", "相談・連絡"]])
+    contact_df = person_df[
+        person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
+    ]
+    st.dataframe(contact_df[["Date", "相談・連絡"]])
+
