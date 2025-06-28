@@ -9,7 +9,7 @@ import altair as alt
 
 # ===== ページ設定 =====
 st.set_page_config(page_title="通所日報ダッシュボード", layout="wide")
-st.title("📝 通所日報ダッシュボード（完全修正版）")
+st.title("📝 通所日報ダッシュボード")
 
 # ===== Google 認証 =====
 scope = [
@@ -21,14 +21,12 @@ credentials = Credentials.from_service_account_info(
     st.secrets["connections"]["gsheets"],
     scopes=scope
 )
-
 client = gspread.authorize(credentials)
 
 # ===== スプレッドシートを開く =====
 sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 spreadsheet = client.open_by_url(sheet_url)
 
-# ===== シート読み込み =====
 worksheet_form = spreadsheet.worksheet("フォームの回答 1")
 records_form = worksheet_form.get_all_records()
 df_form = pd.DataFrame(records_form)
@@ -42,7 +40,6 @@ df_form.rename(columns={
     df_form.columns[0]: "Timestamp",
     df_form.columns[1]: "Email",
 }, inplace=True)
-
 df_map.columns = ["Email", "Name"]
 
 df = pd.merge(df_form, df_map, on="Email", how="left")
@@ -53,7 +50,7 @@ df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 df["Weekday"] = df["Timestamp"].dt.day_name()
 
-# === 起床・就寝時間を シリアル値 or 文字列 両対応でパース
+# ✅ 起床・就寝時間を柔軟にパース
 def parse_time(val):
     try:
         if isinstance(val, str):
@@ -68,15 +65,13 @@ def parse_time(val):
 df["起床時間_dt"] = df["起床時間"].apply(parse_time)
 df["就寝時間_dt"] = df["就寝時間"].apply(parse_time)
 
-
 df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
 df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
 
-# === 不要列を削除
+# === 不要列
 columns_to_hide = ["名"]
 df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
 
-# === 列順: Timestamp_str → Name → 他 → Email
 cols = df.columns.tolist()
 for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
     if col in cols:
@@ -120,7 +115,6 @@ elif mode == "👤 利用者別（月別）":
         sorted(df["YearMonth"].dropna().unique())
     )
 
-    # ✅ 【ここ！】ミス修正済み
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
     display_user_df = user_df.drop(columns=["Timestamp"])
@@ -164,16 +158,31 @@ else:
     )
     st.altair_chart(heatmap, use_container_width=True)
 
-    st.markdown("### ⏰ 起床時間・就寝時間 平均とばらつき")
-    valid_wakeup = person_df["起床時間_dt"].dropna()
-    seconds = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60 + valid_wakeup.dt.second
-    avg_sec = seconds.mean()
-    std_sec = seconds.std()
-    avg_hour = avg_sec / 3600 if pd.notna(avg_sec) else None
-    std_hour = std_sec / 3600 if pd.notna(std_sec) else None
+    st.markdown("### ⏰ 起床・就寝時間 平均とばらつき")
 
-    st.metric("平均起床時間 (時)", f"{avg_hour:.2f}" if avg_hour else "データなし")
-    st.metric("起床時間のばらつき (時)", f"{std_hour:.2f}" if std_hour else "データなし")
+    def sec2hm(s):
+        if pd.isna(s):
+            return "データなし"
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        return f"{h:02}:{m:02}"
+
+    # 起床
+    valid_wakeup = person_df["起床時間_dt"].dropna()
+    wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60 + valid_wakeup.dt.second
+    wakeup_mean_sec = wakeup_sec.mean()
+    wakeup_std_sec = wakeup_sec.std()
+
+    # 就寝
+    valid_bed = person_df["就寝時間_dt"].dropna()
+    bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60 + valid_bed.dt.second
+    bed_mean_sec = bed_sec.mean()
+    bed_std_sec = bed_sec.std()
+
+    st.metric("平均起床時間", sec2hm(wakeup_mean_sec))
+    st.metric("起床時間のばらつき (分)", f"{wakeup_std_sec/60:.1f}" if pd.notna(wakeup_std_sec) else "データなし")
+    st.metric("平均就寝時間", sec2hm(bed_mean_sec))
+    st.metric("就寝時間のばらつき (分)", f"{bed_std_sec/60:.1f}" if pd.notna(bed_std_sec) else "データなし")
 
     st.markdown("### 💤 睡眠時間の推移")
     sleep_df = person_df[["Date", "睡眠時間_h"]].dropna().drop_duplicates("Date")
