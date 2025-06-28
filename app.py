@@ -167,20 +167,30 @@ else:
         m = int((s % 3600) // 60)
         return f"{h:02}:{m:02}"
 
-    # 起床
+    # ✅ 起床時間（秒）
     valid_wakeup = person_df["起床時間_dt"].dropna()
     wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60 + valid_wakeup.dt.second
-    wakeup_mean_sec = wakeup_sec.mean()
-    wakeup_std_sec = wakeup_sec.std()
 
-    # 就寝
+    # ✅ 就寝時間（秒） ← 日付は無視して時間だけで計算
     valid_bed = person_df["就寝時間_dt"].dropna()
     bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60 + valid_bed.dt.second
+    # 💡 注意: 23:00 など深夜時間はそのまま秒で扱う
+
+    wakeup_mean_sec = wakeup_sec.mean()
+    wakeup_std_sec = wakeup_sec.std()
     bed_mean_sec = bed_sec.mean()
     bed_std_sec = bed_sec.std()
 
+    def sec2hm(s):
+        if pd.isna(s):
+            return "データなし"
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        return f"{h:02}:{m:02}"
+
     st.metric("平均起床時間", sec2hm(wakeup_mean_sec))
     st.metric("起床時間のばらつき (分)", f"{wakeup_std_sec/60:.1f}" if pd.notna(wakeup_std_sec) else "データなし")
+
     st.metric("平均就寝時間", sec2hm(bed_mean_sec))
     st.metric("就寝時間のばらつき (分)", f"{bed_std_sec/60:.1f}" if pd.notna(bed_std_sec) else "データなし")
 
