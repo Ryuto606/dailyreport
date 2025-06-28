@@ -147,23 +147,47 @@ elif mode == "👤 利用者別（月別）":
     sel_name = st.selectbox("利用者を選択", names)
     sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].dropna().unique()))
 
+    # ===== 通所日報 =====
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)].sort_values("Timestamp")
     display_user_df = user_df[[c for c in show_cols if c in user_df.columns and c != "Date"]]
 
+    # カラム順: Timestamp_str → Name → 残り
+    user_cols = display_user_df.columns.tolist()
+    user_cols = [c for c in user_cols if c not in ["Timestamp_str", "Name"]]
+    display_user_df = display_user_df[["Timestamp_str", "Name"] + user_cols]
+
     st.subheader(f"👤 {sel_name} さん {sel_month} 【通所日報】（{len(display_user_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_user_df)
-    gb.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
-    for col in display_user_df.columns:
+    gb.configure_default_column(
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
+    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
+    gb.configure_column("Name", header_name="名前", pinned="left")
+    for col in user_cols:
         gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
+    # ===== 退所日報 =====
     user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)].sort_values("Timestamp")
-    st.subheader(f"👤 {sel_name} {sel_month} 【退所日報】（{len(user_exit_df)} 件）")
-    gb_exit = GridOptionsBuilder.from_dataframe(user_exit_df)
+    display_exit_df = user_exit_df.drop(
+        columns=["Timestamp", "Email", "Date", "YearMonth"],
+        errors="ignore"
+    )
+
+    # カラム順: Timestamp_str → Name → 残り
+    exit_cols = display_exit_df.columns.tolist()
+    exit_cols = [c for c in exit_cols if c not in ["Timestamp_str", "Name"]]
+    display_exit_df = display_exit_df[["Timestamp_str", "Name"] + exit_cols]
+
+    st.subheader(f"👤 {sel_name} {sel_month} 【退所日報】（{len(display_exit_df)} 件）")
+    gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
     gb_exit.configure_default_column(wrapText=True, autoHeight=True)
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
-    gb_exit.configure_column("Name", pinned="left")
-    AgGrid(user_exit_df, gridOptions=gb_exit.build(), height=600)
+    gb_exit.configure_column("Name", header_name="名前", pinned="left")
+    AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
 
 else:
     names = sorted(df["Name"].dropna().unique())
