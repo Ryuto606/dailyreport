@@ -1,0 +1,9 @@
+# secrets.toml を除外する
+.streamlit/secrets.toml
+
+# Python ゴミファイル
+__pycache__/
+*.pyc
+
+# macOS のゴミ
+.DS_Store
