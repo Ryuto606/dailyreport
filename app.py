@@ -86,15 +86,13 @@ for col in ["Timestamp_str", "Name", "Email", "Timestamp"]:
         cols_exit.remove(col)
 df_exit = df_exit[["Timestamp_str", "Name"] + cols_exit + ["Email", "Timestamp"]]
 
-# ✅ 通所表示は相談・連絡までに限定
+# ===== 表示対象列 =====
 show_cols = [
     "Timestamp_str", "Name", "Date", "Weekday",
     "就寝時間", "起床時間", "睡眠時間", "睡眠の質", "朝食",
-    "入浴", "服薬", "体温（℃）",
+    "入浴", "服薬", "体温（℃）　※任意",
     "気分（起床時）",
-    "オフタイムコントロール [睡眠]",  # これを列名マッピングで「睡眠」にするなら後で対応
-    "オフタイムコントロール [食事]",
-    "オフタイムコントロール [ストレス]",
+    "睡眠", "食事", "ストレス",
     "良好サイン", "注意サイン", "悪化サイン",
     "今日の自分の状態の課題は？", "課題の原因はなんですか？", "課題の対処はどうしますか？",
     "本日の訓練内容および出席講座（箇条書き）",
@@ -102,7 +100,34 @@ show_cols = [
     "相談・連絡"
 ]
 
-# show_cols を適切に制御（「相談・連絡」まで必要な場合は手動で順序を調整）
+# ===== 表示用ヘッダ名マッピング =====
+header_map = {
+    "Timestamp_str": "Timestamp",
+    "Name": "氏名",
+    "Date": "日付",
+    "Weekday": "曜日",
+    "就寝時間": "就寝時間",
+    "起床時間": "起床時間",
+    "睡眠時間": "睡眠時間",
+    "睡眠の質": "睡眠の質",
+    "朝食": "朝食",
+    "入浴": "入浴",
+    "服薬": "服薬",
+    "体温（℃）　※任意": "体温",
+    "気分（起床時）": "気分",
+    "睡眠": "睡眠",
+    "食事": "食事",
+    "ストレス": "ストレス",
+    "良好サイン": "良好サイン",
+    "注意サイン": "注意サイン",
+    "悪化サイン": "悪化サイン",
+    "今日の自分の状態の課題は？": "課題",
+    "課題の原因はなんですか？": "課題の原因",
+    "課題の対処はどうしますか？": "課題の対処",
+    "本日の訓練内容および出席講座（箇条書き）": "訓練内容",
+    "今日の目標": "今日の目標",
+    "相談・連絡": "相談・連絡"
+}
 
 # ===== UI =====
 mode = st.radio(
@@ -113,17 +138,17 @@ mode = st.radio(
 
 if mode == "📅 日付別（全員）":
     sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
-
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")]
     daily_df = daily_df.sort_values("Timestamp", ascending=True)
-    display_df = daily_df[show_cols].drop(columns=["Email", "Timestamp"], errors="ignore")
+    available_cols = [c for c in show_cols if c in daily_df.columns]
+    display_df = daily_df[available_cols]
 
     st.subheader(f"📅 {sel_date} 【通所日報】（{len(display_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_df)
     gb.configure_default_column(editable=False)
-    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
-    gb.configure_column("Name", pinned="left")
-    AgGrid(display_df, gridOptions=gb.build(), height=400)
+    for col in available_cols:
+        gb.configure_column(col, header_name=header_map.get(col, col))
+    AgGrid(display_df, gridOptions=gb.build(), height=600)
 
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")]
     exit_df = exit_df.sort_values("Timestamp", ascending=True)
@@ -140,28 +165,23 @@ elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
     sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].dropna().unique()))
-
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
-    display_user_df = user_df[show_cols].drop(columns=["Email", "Timestamp"], errors="ignore")
+    available_cols = [c for c in show_cols if c in user_df.columns]
+    display_user_df = user_df[available_cols]
 
-    st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(user_df)} 件）")
-    gb = GridOptionsBuilder.from_dataframe(user_df.drop(columns=["Timestamp"]))
+    st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(display_user_df)} 件）")
+    gb = GridOptionsBuilder.from_dataframe(display_user_df)
     gb.configure_default_column(editable=False)
-    gb.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
-    gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
-    gb.configure_column("Name", pinned="left")
-    gb.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
-    gb.configure_column("オフタイムコントロール [食事]", header_name="食事")
-    gb.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
-    AgGrid(user_df.drop(columns=["Timestamp"]), gridOptions=gb.build(), height=400)
+    for col in available_cols:
+        gb.configure_column(col, header_name=header_map.get(col, col))
+    AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
     user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)]
     user_exit_df = user_exit_df.sort_values("Timestamp", ascending=True)
     st.subheader(f"👤 {sel_name} {sel_month} 【退所日報】（{len(user_exit_df)} 件）")
     gb_exit = GridOptionsBuilder.from_dataframe(user_exit_df.drop(columns=["Timestamp"]))
     gb_exit.configure_default_column(editable=False)
-    gb_exit.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
     AgGrid(user_exit_df.drop(columns=["Timestamp"]), gridOptions=gb_exit.build(), height=400)
@@ -180,7 +200,7 @@ else:
     heatmap = alt.Chart(
         person_df.groupby(["YearMonth", "Weekday"]).size().reset_index(name="Count")
     ).mark_rect().encode(
-        x=alt.X('Weekday:N', sort=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]),
+        x=alt.X('Weekday:N', sort=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
         y='YearMonth:N',
         color='Count:Q'
     )
@@ -192,7 +212,6 @@ else:
 
     wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60
     bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60
-
     bed_sec_adj = [b+86400 if b < w else b for w, b in zip(wakeup_sec, bed_sec)]
 
     def sec2hm(s): h, m = divmod(int(s)//60, 60); return f"{h:02}:{m:02}"
@@ -225,4 +244,4 @@ else:
         st.info("テキストが不足しています（すべて『なし』か空です）。")
 
     st.markdown("### 📌 相談・連絡")
-    st.dataframe(person_df[person_df["相談・連絡"].notna()][["Date","相談・連絡"]])
+    st.dataframe(person_df[person_df["相談・連絡"].notna()][["Date", "相談・連絡"]])
