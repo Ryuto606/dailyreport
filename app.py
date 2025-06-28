@@ -39,7 +39,7 @@ df_map = pd.DataFrame(records_map)
 sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
 
-worksheet_exit = spreadsheet_exit.worksheet("フォームの回答 1")
+worksheet_exit = spreadsheet_exit.worksheet("Sheet1")
 records_exit = worksheet_exit.get_all_records()
 df_exit = pd.DataFrame(records_exit)
 
