@@ -88,9 +88,20 @@ df_exit = df_exit[["Timestamp_str", "Name"] + cols_exit + ["Email", "Timestamp"]
 
 # ✅ 通所表示は相談・連絡までに限定
 show_cols = [
-    col for col in df.columns
-    if col in ["Timestamp_str", "Name"] or col == "相談・連絡" or not col.startswith("Email") and col != "Timestamp"
+    "Timestamp_str", "Name", "Date", "Weekday",
+    "就寝時間", "起床時間", "睡眠時間", "睡眠の質", "朝食",
+    "入浴", "服薬", "体温（℃）",
+    "気分（起床時）",
+    "オフタイムコントロール [睡眠]",  # これを列名マッピングで「睡眠」にするなら後で対応
+    "オフタイムコントロール [食事]",
+    "オフタイムコントロール [ストレス]",
+    "良好サイン", "注意サイン", "悪化サイン",
+    "今日の自分の状態の課題は？", "課題の原因はなんですか？", "課題の対処はどうしますか？",
+    "本日の訓練内容および出席講座（箇条書き）",
+    "今日の目標",
+    "相談・連絡"
 ]
+
 # show_cols を適切に制御（「相談・連絡」まで必要な場合は手動で順序を調整）
 
 # ===== UI =====
@@ -132,6 +143,8 @@ elif mode == "👤 利用者別（月別）":
 
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
+    display_user_df = user_df[show_cols].drop(columns=["Email", "Timestamp"], errors="ignore")
+
     st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(user_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(user_df.drop(columns=["Timestamp"]))
     gb.configure_default_column(editable=False)
