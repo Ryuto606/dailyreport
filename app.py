@@ -68,7 +68,6 @@ df["就寝時間_dt"] = df["就寝時間"].apply(parse_time)
 df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
 df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
 
-# === 不要列
 columns_to_hide = ["名"]
 df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
 
@@ -160,21 +159,20 @@ else:
 
     st.markdown("### ⏰ 起床・就寝時間 平均とばらつき")
 
-    def sec2hm(s):
-        if pd.isna(s):
-            return "データなし"
-        h = int(s // 3600)
-        m = int((s % 3600) // 60)
-        return f"{h:02}:{m:02}"
-
-    # ✅ 起床時間（秒）
     valid_wakeup = person_df["起床時間_dt"].dropna()
     wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60 + valid_wakeup.dt.second
 
-    # ✅ 就寝時間（秒） ← 日付は無視して時間だけで計算
     valid_bed = person_df["就寝時間_dt"].dropna()
     bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60 + valid_bed.dt.second
-    # 💡 注意: 23:00 など深夜時間はそのまま秒で扱う
+
+    bed_sec_adjusted = []
+    for w, b in zip(wakeup_sec, bed_sec):
+        if b > w:
+            bed_sec_adjusted.append(b)
+        else:
+            bed_sec_adjusted.append(b + 86400)  # +24h
+
+    bed_sec = pd.Series(bed_sec_adjusted)
 
     wakeup_mean_sec = wakeup_sec.mean()
     wakeup_std_sec = wakeup_sec.std()
@@ -184,6 +182,7 @@ else:
     def sec2hm(s):
         if pd.isna(s):
             return "データなし"
+        s = s % 86400  # 24時間制に丸める
         h = int(s // 3600)
         m = int((s % 3600) // 60)
         return f"{h:02}:{m:02}"
