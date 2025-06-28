@@ -156,9 +156,6 @@ elif mode == "👤 利用者別（月別）":
     gb_exit.configure_default_column(tooltipField="__colName__", wrapText=True, autoHeight=True, cellStyle={'whiteSpace': 'normal'})
     gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb_exit.configure_column("Name", pinned="left")
-    gb_exit.configure_column("オフタイムコントロール [睡眠]", header_name="睡眠")
-    gb_exit.configure_column("オフタイムコントロール [食事]", header_name="食事")
-    gb_exit.configure_column("オフタイムコントロール [ストレス]", header_name="ストレス")
     AgGrid(user_exit_df.drop(columns=["Timestamp"]), gridOptions=gb_exit.build(), height=400)
 
 else:
