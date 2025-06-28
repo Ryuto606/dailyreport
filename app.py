@@ -165,16 +165,32 @@ elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
     sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].dropna().unique()))
+
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)]
     user_df = user_df.sort_values("Timestamp", ascending=True)
+
+    # ✅ 表示は show_cols ベース・Date は表示しない
     available_cols = [c for c in show_cols if c in user_df.columns]
+    available_cols = [c for c in available_cols if c != "Date"]
     display_user_df = user_df[available_cols]
 
     st.subheader(f"👤 {sel_name} {sel_month} 【通所日報】（{len(display_user_df)} 件）")
+
     gb = GridOptionsBuilder.from_dataframe(display_user_df)
     gb.configure_default_column(editable=False)
+
     for col in available_cols:
         gb.configure_column(col, header_name=header_map.get(col, col))
+        if col == "睡眠時間":
+            gb.configure_column(col, maxWidth=80)
+        if col == "今日の目標":
+            gb.configure_column(
+                col,
+                tooltipField=col,
+                wrapText=True,
+                autoHeight=True,
+                cellStyle={'whiteSpace': 'normal'}
+            )
     AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
     user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)]
