@@ -218,19 +218,19 @@ else:
     else:
         st.info("データが不足しています。")
 
-    st.markdown("### 🌙 オフタイム自己管理度の推移")
-    off_cols = [
-        "オフタイムコントロール [睡眠]",
-        "オフタイムコントロール [食事]",
-        "オフタイムコントロール [ストレス]",
-    ]
-    off_map = {"〇": 2, "△": 1, "✕": 0}
-    for col in off_cols:
-        person_df[col] = person_df[col].map(off_map)
+    # st.markdown("### 🌙 オフタイム自己管理度の推移")
+    # off_cols = [
+    #     "オフタイムコントロール [睡眠]",
+    #     "オフタイムコントロール [食事]",
+    #     "オフタイムコントロール [ストレス]",
+    # ]
+    # off_map = {"〇": 2, "△": 1, "✕": 0}
+    # for col in off_cols:
+    #     person_df[col] = person_df[col].map(off_map)
 
-    off_df = person_df[["Date"] + off_cols].dropna()
-    off_df = off_df.groupby("Date")[off_cols].mean().reset_index()
-    st.line_chart(off_df.set_index("Date"))
+    # off_df = person_df[["Date"] + off_cols].dropna()
+    # off_df = off_df.groupby("Date")[off_cols].mean().reset_index()
+    # st.line_chart(off_df.set_index("Date"))
 
     st.markdown("### 📌 相談・連絡（『なし』以外）")
     contact_df = person_df[
