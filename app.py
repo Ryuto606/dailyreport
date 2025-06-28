@@ -7,10 +7,9 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import altair as alt
 
-
 # ===== ページ設定 =====
 st.set_page_config(page_title="通所日報ダッシュボード", layout="wide")
-st.title("📝 通所日報ダッシュボード")
+st.title("📝 通所日報ダッシュボード（完全版）")
 
 # ===== Google 認証 =====
 scope = [
@@ -18,7 +17,6 @@ scope = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-# Streamlit Cloud の secrets から認証情報を取得
 credentials = Credentials.from_service_account_info(
     st.secrets["connections"]["gsheets"],
     scopes=scope
@@ -31,18 +29,15 @@ sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVc
 spreadsheet = client.open_by_url(sheet_url)
 
 # ===== シート読み込み =====
-# ① フォーム回答シート
 worksheet_form = spreadsheet.worksheet("フォームの回答 1")
 records_form = worksheet_form.get_all_records()
 df_form = pd.DataFrame(records_form)
 
-# ② メールアドレス ⇨ 氏名対応表シート
 worksheet_map = spreadsheet.worksheet("一覧")
 records_map = worksheet_map.get_all_records()
 df_map = pd.DataFrame(records_map)
 
 # ===== データ前処理 =====
-# カラム整理
 df_form.rename(columns={
     df_form.columns[0]: "Timestamp",
     df_form.columns[1]: "Email",
@@ -50,32 +45,27 @@ df_form.rename(columns={
 
 df_map.columns = ["Email", "Name"]
 
-# JOIN
 df = pd.merge(df_form, df_map, on="Email", how="left")
 
-# === 日付列 & 表示用列 ===
 df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 df["Timestamp_str"] = df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
 df["Date"] = df["Timestamp"].dt.strftime("%Y-%m-%d")
 df["YearMonth"] = df["Timestamp"].dt.strftime("%Y-%m")
 df["Weekday"] = df["Timestamp"].dt.day_name()
 
-# === 起床・就寝時間を datetime に変換（前日跨ぎは簡易）
+# 起床・就寝時間の整形
+df["起床時間"] = df["起床時間"].astype(str).str.zfill(5)
+df["就寝時間"] = df["就寝時間"].astype(str).str.zfill(5)
+
 df["起床時間_dt"] = pd.to_datetime(df["起床時間"], format="%H:%M", errors="coerce")
 df["就寝時間_dt"] = pd.to_datetime(df["就寝時間"], format="%H:%M", errors="coerce")
 
-# === 睡眠時間（時間単位）
 df["睡眠時間_h"] = (df["起床時間_dt"] - df["就寝時間_dt"]).dt.total_seconds() / 3600
-# もしマイナスなら24h足す
 df.loc[df["睡眠時間_h"] < 0, "睡眠時間_h"] += 24
 
-# === 不要な列を削除
+# === 不要列を削除 ===
 columns_to_hide = ["名"]
 df = df.drop(columns=[col for col in columns_to_hide if col in df.columns])
-
-# === 「名前」を Timestamp の次に移動
-# まず今のカラム順を取得
-cols = df.columns.tolist()
 
 # === 列順: Timestamp_str → Name → 他 → Email ===
 cols = df.columns.tolist()
@@ -143,16 +133,14 @@ elif mode == "👤 利用者別（月別）":
 else:
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("分析対象を選択", names)
-    person_df = df[df["Name"] == sel_name]
+    person_df = df[df["Name"] == sel_name].copy()
 
-    st.subheader(f"📊 {sel_name} の人ごと分析")
+    st.subheader(f"📊 {sel_name} の日報分析")
 
-    # === 1️⃣ 月ごとの通所回数
     st.markdown("### 📅 月ごとの通所回数")
     month_counts = person_df.groupby("YearMonth").size().reset_index(name="Count")
     st.bar_chart(month_counts.set_index("YearMonth"))
 
-    # === 曜日ヒートマップ（例）
     st.markdown("### 📅 曜日別の出席傾向")
     weekday_counts = (
         person_df.groupby(["YearMonth", "Weekday"])
@@ -166,7 +154,6 @@ else:
     )
     st.altair_chart(heatmap, use_container_width=True)
 
-    # === 2️⃣ 生活リズム
     st.markdown("### ⏰ 起床時間・就寝時間 平均とばらつき")
     起床平均 = person_df["起床時間_dt"].dt.hour.mean()
     起床std = person_df["起床時間_dt"].dt.hour.std()
@@ -177,7 +164,6 @@ else:
     sleep_df = person_df[["Date", "睡眠時間_h"]].dropna().drop_duplicates("Date")
     st.line_chart(sleep_df.set_index("Date"))
 
-    # === 4️⃣ WordCloud
     st.markdown("### 🎯 目標・課題 WordCloud")
     texts = (
         person_df["今日の目標"].dropna().tolist()
@@ -186,7 +172,12 @@ else:
     text_all = " ".join(texts)
 
     if text_all.strip():
-        wc = WordCloud(background_color="white", font_path=None, width=800, height=400).generate(text_all)
+        wc = WordCloud(
+            background_color="white",
+            font_path="/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            width=800,
+            height=400
+        ).generate(text_all)
         fig, ax = plt.subplots()
         ax.imshow(wc, interpolation="bilinear")
         ax.axis("off")
@@ -194,18 +185,20 @@ else:
     else:
         st.info("データが不足しています。")
 
-    # === 6️⃣ オフタイム
     st.markdown("### 🌙 オフタイム自己管理度の推移")
     off_cols = [
         "オフタイムコントロール [睡眠]",
         "オフタイムコントロール [食事]",
         "オフタイムコントロール [ストレス]",
     ]
+    off_map = {"〇": 2, "△": 1, "✕": 0}
+    for col in off_cols:
+        person_df[col] = person_df[col].map(off_map)
+
     off_df = person_df[["Date"] + off_cols].dropna()
     off_df = off_df.groupby("Date")[off_cols].mean().reset_index()
     st.line_chart(off_df.set_index("Date"))
 
-    # === 相談・連絡 「なし」以外
     st.markdown("### 📌 相談・連絡（『なし』以外）")
     contact_df = person_df[
         person_df["相談・連絡"].notna() & (person_df["相談・連絡"] != "なし")
