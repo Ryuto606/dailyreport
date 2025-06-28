@@ -182,10 +182,7 @@ else:
         (df_exit["Name"] == sel_name) &
         df_exit["その他"].notna() & (df_exit["その他"].str.strip() != "なし")
     ]
-    if not contact_exit_df.empty:
-        st.dataframe(contact_exit_df[["Date", "その他"]])
-    else:
-        st.info("退所日報の『その他』には有効な入力がありません。")
+    st.dataframe(contact_exit_df[["Date", "その他"]])
 
     st.markdown("### 目標・課題 WordCloud")
     texts = (
