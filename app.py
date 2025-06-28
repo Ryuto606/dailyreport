@@ -6,6 +6,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import altair as alt
+import pytz
+from datetime import datetime
 
 # ===== ページ設定 =====
 st.set_page_config(page_title="通所・退所日報ダッシュボード", layout="wide")
@@ -90,7 +92,14 @@ mode = st.radio(
 )
 
 if mode == "📅 日付別（全員）":
-    sel_date = st.date_input("表示する日付", value=pd.Timestamp.today().date())
+    # タイムゾーン付きの「今日」
+    japan = pytz.timezone("Asia/Tokyo")
+    today_jst = datetime.now(japan).date()
+
+    sel_date = st.date_input(
+        "表示する日付",
+        value=today_jst
+    )
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
     display_df = daily_df[[c for c in show_cols if c in daily_df.columns]]
 
