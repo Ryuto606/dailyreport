@@ -30,7 +30,7 @@ spreadsheet = client.open_by_url(sheet_url)
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
 
 # ✅ フォーム回答
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=10)
 def load_form():
     return pd.DataFrame(spreadsheet.worksheet("フォームの回答 1").get_all_records())
 
@@ -40,7 +40,7 @@ def load_map():
     return pd.DataFrame(spreadsheet.worksheet("一覧").get_all_records())
 
 # ✅ 退所日報
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=10)
 def load_exit():
     return pd.DataFrame(spreadsheet_exit.worksheet("Sheet1").get_all_records())
 
