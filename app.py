@@ -22,14 +22,33 @@ credentials = Credentials.from_service_account_info(
 client = gspread.authorize(credentials)
 
 # ===== スプレッドシート読み込み =====
-sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
-spreadsheet = client.open_by_url(sheet_url)
-df_form = pd.DataFrame(spreadsheet.worksheet("フォームの回答 1").get_all_records())
-df_map = pd.DataFrame(spreadsheet.worksheet("一覧").get_all_records())
 
+sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
+
+spreadsheet = client.open_by_url(sheet_url)
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
-df_exit = pd.DataFrame(spreadsheet_exit.worksheet("Sheet1").get_all_records())
+
+# ✅ フォーム回答
+@st.cache_data(ttl=15)
+def load_form():
+    return pd.DataFrame(spreadsheet.worksheet("フォームの回答 1").get_all_records())
+
+# ✅ 一覧マスター
+@st.cache_data(ttl=600)
+def load_map():
+    return pd.DataFrame(spreadsheet.worksheet("一覧").get_all_records())
+
+# ✅ 退所日報
+@st.cache_data(ttl=15)
+def load_exit():
+    return pd.DataFrame(spreadsheet_exit.worksheet("Sheet1").get_all_records())
+
+# === 呼び出し ===
+df_form = load_form()
+df_map  = load_map()
+df_exit = load_exit()
+
 
 # ===== 前処理 =====
 df_form.rename(columns={df_form.columns[0]: "Timestamp", df_form.columns[1]: "Email"}, inplace=True)
