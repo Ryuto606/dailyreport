@@ -6,3 +6,4 @@ streamlit-aggrid
 wordcloud
 altair
 matplotlib
+pytz
