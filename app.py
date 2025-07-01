@@ -164,7 +164,21 @@ if mode == "📅 日付別（全員）":
 elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
-    sel_month = st.selectbox("表示する月", sorted(df["YearMonth"].dropna().unique()))
+
+       # 当月の YYYY-MM 形式
+    japan = pytz.timezone("Asia/Tokyo")
+    now_month = datetime.now(japan).strftime("%Y-%m")
+
+    # 月リスト
+    months = sorted(df["YearMonth"].dropna().unique())
+    # 当月があればその index を使う
+    month_idx = months.index(now_month) if now_month in months else 0
+
+    sel_month = st.selectbox(
+        "表示する月",
+        months,
+        index=month_idx
+    )
 
     # ===== 通所日報 =====
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)].sort_values("Timestamp")
