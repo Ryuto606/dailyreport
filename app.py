@@ -291,7 +291,12 @@ else:
         person_df["今日の目標"].dropna().tolist()
         + person_df["課題の対処はどうしますか？"].dropna().tolist()
     )
-    texts = [t for t in texts if str(t).strip() and str(t).strip() != "なし"]
+    # 除外したい完全一致のパターン
+    exclude_words = ["なし", "なし。", "ありません", "ありません。", "ございません"]
+    texts = [
+        t for t in texts
+        if str(t).strip() and str(t).strip() not in exclude_words
+    ]
     text_all = " ".join(texts)
     if text_all.strip():
         wc = WordCloud(
