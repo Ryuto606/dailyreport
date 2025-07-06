@@ -273,16 +273,30 @@ else:
         "BedStdMin": "就寝ばらつき(分)"
     }))
 
-    st.markdown("### 📌 相談・連絡（通所）")
+    # 除外ワード（完全一致で除く）
+    exclude_words = [
+        "なし", "なし。", "とくになし", "特になし", "特になし。",
+        "ありません", "特にありません", "特にありません。", "ありません。", "ございません"
+    ]
+
+    # 前後空白だけ strip で除去して小文字化
+    def clean_text_no_re(s):
+        if not isinstance(s, str):
+            return ""
+        return s.strip().replace("　", "").lower()
+
+    # 📌 相談・連絡（通所）
     contact_df = person_df[
-        person_df["相談・連絡"].notna() & (person_df["相談・連絡"].str.strip() != "なし")
+        person_df["相談・連絡"].notna()
+        & ~person_df["相談・連絡"].apply(clean_text_no_re).isin(exclude_words)
     ]
     st.dataframe(contact_df[["Date", "相談・連絡"]])
 
-    st.markdown("### 🗂 その他（退所）")
+    # 🗂 その他（退所）
     contact_exit_df = df_exit[
-        (df_exit["Name"] == sel_name) &
-        df_exit["その他"].notna() & (df_exit["その他"].str.strip() != "なし")
+        (df_exit["Name"] == sel_name)
+        & df_exit["その他"].notna()
+        & ~df_exit["その他"].apply(clean_text_no_re).isin(exclude_words)
     ]
     st.dataframe(contact_exit_df[["Date", "その他"]])
 
