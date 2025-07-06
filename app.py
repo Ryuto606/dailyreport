@@ -232,21 +232,24 @@ else:
     st.markdown("### 月ごとの通所回数")
     st.bar_chart(person_df.groupby("YearMonth").size())
 
-    st.markdown("### 起床・就寝時間 平均とばらつき")
-    valid_wakeup = person_df["起床時間_dt"].dropna()
-    wakeup_sec = valid_wakeup.dt.hour * 3600 + valid_wakeup.dt.minute * 60
+    st.markdown("### 月ごとの起床・就寝時間 平均とばらつき")
 
-    valid_bed = person_df["就寝時間_dt"].dropna()
-    bed_sec = valid_bed.dt.hour * 3600 + valid_bed.dt.minute * 60
+    # 起床・就寝を秒化
+    valid = person_df.dropna(subset=["起床時間_dt", "就寝時間_dt"]).copy()
+    valid["wakeup_sec"] = valid["起床時間_dt"].dt.hour * 3600 + valid["起床時間_dt"].dt.minute * 60
+    valid["bed_sec_raw"] = valid["就寝時間_dt"].dt.hour * 3600 + valid["就寝時間_dt"].dt.minute * 60
 
     # 補正
-    bed_sec_adjusted = []
-    for w, b in zip(wakeup_sec, bed_sec):
-        if b > w:
-            bed_sec_adjusted.append(b)
-        else:
-            bed_sec_adjusted.append(b + 86400)
-    bed_sec = pd.Series(bed_sec_adjusted)
+    def adjust_bed(row):
+        return row["bed_sec_raw"] if row["bed_sec_raw"] > row["wakeup_sec"] else row["bed_sec_raw"] + 86400
+    valid["bed_sec"] = valid.apply(adjust_bed, axis=1)
+
+    # 月ごとに平均・標準偏差
+    stat = valid.groupby("YearMonth").agg({
+        "wakeup_sec": ["mean", "std"],
+        "bed_sec": ["mean", "std"]
+    }).reset_index()
+    stat.columns = ["YearMonth", "WakeupMean", "WakeupStd", "BedMean", "BedStd"]
 
     def sec2hm(s):
         s = s % 86400
@@ -254,13 +257,22 @@ else:
         m = int((s % 3600) // 60)
         return f"{h:02}:{m:02}"
 
-    st.metric("平均起床時間", sec2hm(wakeup_sec.mean()))
-    st.metric("起床時間のばらつき (分)", f"{wakeup_sec.std()/60:.1f}")
+    stat["WakeupMeanHM"] = stat["WakeupMean"].apply(sec2hm)
+    stat["BedMeanHM"] = stat["BedMean"].apply(sec2hm)
+    stat["WakeupStdMin"] = stat["WakeupStd"] / 60
+    stat["BedStdMin"] = stat["BedStd"] / 60
 
-    st.metric("平均就寝時間", sec2hm(bed_sec.mean()))
-    st.metric("就寝時間のばらつき (分)", f"{bed_sec.std()/60:.1f}")
+    st.dataframe(stat[[
+        "YearMonth",
+        "WakeupMeanHM", "WakeupStdMin",
+        "BedMeanHM", "BedStdMin"
+    ]].rename(columns={
+        "WakeupMeanHM": "起床平均",
+        "WakeupStdMin": "起床ばらつき(分)",
+        "BedMeanHM": "就寝平均",
+        "BedStdMin": "就寝ばらつき(分)"
+    }))
 
-    # === 📌 相談・連絡 ===
     st.markdown("### 📌 相談・連絡（通所）")
     contact_df = person_df[
         person_df["相談・連絡"].notna() & (person_df["相談・連絡"].str.strip() != "なし")
