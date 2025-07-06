@@ -292,7 +292,15 @@ else:
         + person_df["課題の対処はどうしますか？"].dropna().tolist()
     )
     # 除外したい完全一致のパターン
-    exclude_words = ["なし", "なし。", "とくになし", "特になし", "特になし。", "ありません", "特にありません。",  "ありません。", "ございません"]
+    exclude_words = [
+        "なし", "なし。", "とくになし", "特になし", "特になし。",
+        "ありません", "特にありません。",  "ありません。", "ございません"
+        ]
+    # 前後空白・改行を正規化し、小文字化して比較
+    def clean_text(s):
+        if not isinstance(s, str):
+            return ""
+        return re.sub(r"\s+", "", s.strip()).lower()
     texts = [
         t for t in texts
         if str(t).strip() and str(t).strip() not in exclude_words
