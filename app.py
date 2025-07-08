@@ -241,28 +241,69 @@ else:
     else:
         st.info("テキストが不足しています（すべて『なし』か空です）。")
 
-    st.markdown("### ✅ 正規化データによる出席状況")
+    st.markdown("### ✅ 出席状況")
+
     person_att = df_attendance[df_attendance['氏名'] == sel_name].copy()
-    present_count = person_att[person_att['出席状況'] == '出席'].shape[0]
-    absent_count = person_att[person_att['出席状況'] == '欠席'].shape[0]
+
+    # 条件ごとにカウントフラグ列を作る
+    def categorize(row):
+        if row['通所形態'] == '通所':
+            if row['出席状況'] == '出席':
+                return 'present'
+            elif row['出席状況'] == '欠席':
+                return 'absent'
+        elif row['通所形態'] == '在宅':
+            if row['出席状況'] == 'リモート':
+                return 'present'
+            elif row['出席状況'] == '欠席':
+                return 'absent'
+        return 'ignore'
+
+    person_att['カウント区分'] = person_att.apply(categorize, axis=1)
+
+    present_count = (person_att['カウント区分'] == 'present').sum()
+    absent_count = (person_att['カウント区分'] == 'absent').sum()
     total_days = present_count + absent_count
     attendance_rate = round((present_count / total_days * 100), 1) if total_days > 0 else 0
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("出席日数", f"{present_count} 日")
     col2.metric("欠席日数", f"{absent_count} 日")
     col3.metric("対象日数", f"{total_days} 日")
     col4.metric("出席率", f"{attendance_rate} %")
-    st.markdown("### 📅 月別 出席数（正規化データ）")
+
+    st.markdown("### 📅 月別 出席数・欠席数（条件フィルタ付き）")
     month_summary = (
-        person_att.groupby(['YearMonth', '出席状況'])
+        person_att[person_att['カウント区分'] != 'ignore']
+        .groupby(['YearMonth', 'カウント区分'])
         .size()
         .reset_index(name='件数')
     )
+
     chart = alt.Chart(month_summary).mark_bar().encode(
         x=alt.X('YearMonth:N', title='年月'),
         y=alt.Y('件数:Q'),
-        color=alt.Color('出席状況:N'),
-        tooltip=['YearMonth', '出席状況', '件数']
+        color=alt.Color('カウント区分:N'),
+        tooltip=['YearMonth', 'カウント区分', '件数']
     ).properties(width=700, height=400)
+
     st.altair_chart(chart, use_container_width=True)
+
+    # 月別の出席率も表で出す
+    month_totals = (
+        month_summary.groupby(['YearMonth', 'カウント区分'])['件数'].sum().unstack(fill_value=0)
+    ).reset_index()
+
+    month_totals['対象日数'] = month_totals.get('present', 0) + month_totals.get('absent', 0)
+    month_totals['出席率(%)'] = month_totals.apply(
+        lambda row: round(row['present'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
+        axis=1
+    )
+
+    st.dataframe(month_totals.rename(columns={
+        'YearMonth': '年月',
+        'present': '出席',
+        'absent': '欠席'
+    }))
+
 
