@@ -263,7 +263,7 @@ else:
         axis=1
     )
     st.dataframe(
-        month_totals[['YearMonth', '出席', '欠席', '対象日数', '出席率']]
+        month_totals[['YearMonth', '出席', '欠席', '対象日数', '出席率(%)']]
     )
 
     st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
