@@ -114,7 +114,7 @@ mode = st.radio(
     horizontal=True
 )
 
-if mode == "📅 日付別（全員）":
+if mode == "📅 日報日付別（全員）":
     japan = pytz.timezone("Asia/Tokyo")
     today_jst = datetime.now(japan).date()
     sel_date = st.date_input("表示する日付", value=today_jst)
@@ -137,7 +137,7 @@ if mode == "📅 日付別（全員）":
     gb_exit.configure_column("Name", header_name="名前", pinned="left")
     AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
 
-elif mode == "👤 利用者別（月別）":
+elif mode == "👤 日報利用者別（月ごと）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
     japan = pytz.timezone("Asia/Tokyo")
