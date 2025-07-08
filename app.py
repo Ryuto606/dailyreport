@@ -25,9 +25,20 @@ client = gspread.authorize(credentials)
 
 sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
+sheet_url_attendance = "https://docs.google.com/spreadsheets/d/1rYV8BsSpyuuBT_KVZR-f0MKbMWQi65lddDQEe_eImuk/edit"
 
 spreadsheet = client.open_by_url(sheet_url)
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
+spreadsheet_attendance = client.open_by_url(sheet_url_attendance)
+
+# === 正規化シート読み込み ===
+@st.cache_data(ttl=600)
+def load_attendance():
+    return pd.DataFrame(spreadsheet_attendance.worksheet("正規化").get_all_records())
+
+df_attendance = load_attendance()
+df_attendance['日付'] = pd.to_datetime(df_attendance['日付'], errors='coerce')
+df_attendance['YearMonth'] = df_attendance['日付'].dt.strftime('%Y-%m')
 
 # ✅ フォーム回答
 @st.cache_data(ttl=10)
@@ -229,6 +240,39 @@ else:
 
     st.subheader(f"📊 {sel_name} の分析")
 
+    # === 正規化データから個人の出席状況 ===
+    person_att = df_attendance[df_attendance['氏名'] == sel_name].copy()
+
+    present_count = person_att[person_att['出席状況'] == '出席'].shape[0]
+    absent_count = person_att[person_att['出席状況'] == '欠席'].shape[0]
+    total_days = present_count + absent_count
+    attendance_rate = round((present_count / total_days * 100), 1) if total_days > 0 else 0
+
+    st.markdown("### ✅ 正規化データによる出席状況")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("出席日数", f"{present_count} 日")
+    col2.metric("欠席日数", f"{absent_count} 日")
+    col3.metric("集計対象", f"{total_days} 日")
+    col4.metric("出席率", f"{attendance_rate} %")
+
+    # 月別グラフ
+    st.markdown("### 📅 月別 出席数・欠席数（正規化データ）")
+    month_summary = (
+        person_att.groupby(['YearMonth', '出席状況'])
+        .size()
+        .reset_index(name='件数')
+    )
+
+    chart = alt.Chart(month_summary).mark_bar().encode(
+        x=alt.X('YearMonth:N', title='年月'),
+        y=alt.Y('件数:Q'),
+        color=alt.Color('出席状況:N'),
+        tooltip=['YearMonth', '出席状況', '件数']
+    ).properties(width=700, height=400)
+
+    st.altair_chart(chart, use_container_width=True)
+
+    # 通所回数
     st.markdown("### 月ごとの通所回数")
     st.bar_chart(person_df.groupby("YearMonth").size())
 
