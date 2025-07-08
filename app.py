@@ -214,7 +214,6 @@ else:
         month_summary.pivot_table(index='YearMonth', columns='区分_表示', values='件数', fill_value=0)
         .reset_index()
     )
-
     month_totals['対象日数'] = month_totals.get('出席', 0) + month_totals.get('欠席', 0)
     month_totals['出席率'] = month_totals.apply(
         lambda row: round(row['出席'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
@@ -258,12 +257,14 @@ else:
 
     # Altair 用に作った pivot をそのまま流用
     st.markdown("### 📅 月別の出欠席数・出席率")
-    month_totals['出席率(%)'] = month_totals.apply(
+    month_totals['出席率'] = month_totals.apply(
         lambda row: round(row['出席'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
         axis=1
     )
     st.dataframe(
-        month_totals[['YearMonth', '出席', '欠席', '対象日数', '出席率(%)']]
+        month_totals.rename(columns={'出席率': '出席率(%)'})[
+            ['YearMonth', '出席', '欠席', '対象日数', '出席率(%)']
+        ]
     )
 
     st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
