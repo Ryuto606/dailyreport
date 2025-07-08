@@ -259,7 +259,7 @@ else:
     # Altair 用に作った pivot をそのまま流用
     st.markdown("### 📅 月別の出欠席数・出席率")
     month_totals['出席率(%)'] = month_totals.apply(
-        lambda row: round(row['present'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
+        lambda row: round(row['出席'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
         axis=1
     )
     st.dataframe(
