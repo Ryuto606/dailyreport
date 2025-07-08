@@ -11,8 +11,8 @@ from datetime import datetime
 import re
 
 # ===== ページ設定 =====
-st.set_page_config(page_title="通所・退所・正規化 出席率ダッシュボード", layout="wide")
-st.title("📝 通所・退所・正規化 出席率 ダッシュボード")
+st.set_page_config(page_title="利用者ダッシュボード", layout="wide")
+st.title("📝 利用者ダッシュボード")
 
 # ===== Google 認証 =====
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
