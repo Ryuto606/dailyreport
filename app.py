@@ -8,11 +8,10 @@ import matplotlib.pyplot as plt
 import altair as alt
 import pytz
 from datetime import datetime
-import re
 
 # ===== ページ設定 =====
-st.set_page_config(page_title="通所・退所・出席率 ダッシュボード", layout="wide")
-st.title("📝 通所・退所・正規化 出席率 ダッシュボード")
+st.set_page_config(page_title="通所・退所日報ダッシュボード", layout="wide")
+st.title("📝 通所・退所日報ダッシュボード")
 
 # ===== Google 認証 =====
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -22,47 +21,39 @@ credentials = Credentials.from_service_account_info(
 )
 client = gspread.authorize(credentials)
 
-# ===== スプレッドシート URL =====
+# ===== スプレッドシート読み込み =====
+
 sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
 sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
-sheet_url_attendance = "https://docs.google.com/spreadsheets/d/1rYV8BsSpyuuBT_KVZR-f0MKbMWQi65lddDQEe_eImuk/edit"
 
 spreadsheet = client.open_by_url(sheet_url)
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
-spreadsheet_attendance = client.open_by_url(sheet_url_attendance)
 
-# ===== 正規化シート =====
-@st.cache_data(ttl=600)
-def load_attendance():
-    return pd.DataFrame(spreadsheet_attendance.worksheet("正規化").get_all_records())
-
-df_attendance = load_attendance()
-df_attendance.columns = df_attendance.columns.map(str.strip)
-df_attendance['日付'] = pd.to_datetime(df_attendance['日付'], errors='coerce')
-df_attendance['YearMonth'] = df_attendance['日付'].dt.strftime('%Y-%m')
-
-# ===== フォーム回答 =====
+# ✅ フォーム回答
 @st.cache_data(ttl=10)
 def load_form():
     return pd.DataFrame(spreadsheet.worksheet("フォームの回答 1").get_all_records())
 
-# ===== 一覧マスター =====
+# ✅ 一覧マスター
 @st.cache_data(ttl=600)
 def load_map():
     return pd.DataFrame(spreadsheet.worksheet("一覧").get_all_records())
 
-# ===== 退所日報 =====
+# ✅ 退所日報
 @st.cache_data(ttl=10)
 def load_exit():
     return pd.DataFrame(spreadsheet_exit.worksheet("Sheet1").get_all_records())
 
+# === 呼び出し ===
 df_form = load_form()
-df_map = load_map()
+df_map  = load_map()
 df_exit = load_exit()
 
-# ===== 通所前処理 =====
+
+# ===== 前処理 =====
 df_form.rename(columns={df_form.columns[0]: "Timestamp", df_form.columns[1]: "Email"}, inplace=True)
 df_map.columns = ["Email", "Name"]
+
 df = pd.merge(df_form, df_map, on="Email", how="left")
 df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 df["Timestamp_str"] = df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
@@ -112,30 +103,56 @@ header_map = {
     "オフタイムコントロール [ストレス]": "ストレス",
 }
 
-# ===== モード切替 =====
+# ===== UI =====
 mode = st.radio(
     "表示モードを選択",
     ["📅 日付別（全員）", "👤 利用者別（月別）", "📊 利用者分析"],
     horizontal=True
 )
 
-# ===== 日付別（全員） =====
 if mode == "📅 日付別（全員）":
+    # タイムゾーン付きの「今日」
     japan = pytz.timezone("Asia/Tokyo")
     today_jst = datetime.now(japan).date()
-    sel_date = st.date_input("表示する日付", value=today_jst)
 
+    sel_date = st.date_input(
+        "表示する日付",
+        value=today_jst
+    )
+
+    # ===== 通所日報 =====
     daily_df = df[df["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
     display_df = daily_df[[c for c in show_cols if c in daily_df.columns]]
+
     st.subheader(f"📅 {sel_date} 【通所日報】（{len(display_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_df)
-    gb.configure_default_column(wrapText=True, autoHeight=True)
+    gb.configure_default_column(
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
+    # ✅ 通所: Timestamp_str と Name を左固定
     gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", header_name="名前", pinned="left")
+    for col in display_df.columns:
+        if col not in ["Timestamp_str", "Name"]:
+            gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_df, gridOptions=gb.build(), height=600)
 
+    # ===== 退所日報 =====
     exit_df = df_exit[df_exit["Date"] == sel_date.strftime("%Y-%m-%d")].sort_values("Timestamp")
-    display_exit_df = exit_df.drop(columns=["Timestamp", "Email", "Date", "YearMonth"], errors="ignore")
+    display_exit_df = exit_df.drop(
+        columns=["Timestamp", "Email", "Date", "YearMonth"],
+        errors="ignore"
+    )
+
+    # ✅ 列順を Timestamp_str → Name → その他 に並べ替え
+    exit_cols = display_exit_df.columns.tolist()
+    exit_cols = [c for c in exit_cols if c not in ["Timestamp_str", "Name"]]
+    exit_cols = ["Timestamp_str", "Name"] + exit_cols
+    display_exit_df = display_exit_df[exit_cols]
+
     st.subheader(f"📅 {sel_date} 【退所日報】（{len(display_exit_df)} 件）")
     gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
     gb_exit.configure_default_column(wrapText=True, autoHeight=True)
@@ -143,61 +160,111 @@ if mode == "📅 日付別（全員）":
     gb_exit.configure_column("Name", header_name="名前", pinned="left")
     AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
 
-# ===== 利用者別（月別） =====
+
 elif mode == "👤 利用者別（月別）":
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("利用者を選択", names)
+
+       # 当月の YYYY-MM 形式
     japan = pytz.timezone("Asia/Tokyo")
     now_month = datetime.now(japan).strftime("%Y-%m")
-    months = sorted(df["YearMonth"].dropna().unique())
-    month_idx = months.index(now_month) if now_month in months else 0
-    sel_month = st.selectbox("表示する月", months, index=month_idx)
 
+    # 月リスト
+    months = sorted(df["YearMonth"].dropna().unique())
+    # 当月があればその index を使う
+    month_idx = months.index(now_month) if now_month in months else 0
+
+    sel_month = st.selectbox(
+        "表示する月",
+        months,
+        index=month_idx
+    )
+
+    # ===== 通所日報 =====
     user_df = df[(df["Name"] == sel_name) & (df["YearMonth"] == sel_month)].sort_values("Timestamp")
     display_user_df = user_df[[c for c in show_cols if c in user_df.columns and c != "Date"]]
+
+    # カラム順: Timestamp_str → Name → 残り
     user_cols = display_user_df.columns.tolist()
     user_cols = [c for c in user_cols if c not in ["Timestamp_str", "Name"]]
     display_user_df = display_user_df[["Timestamp_str", "Name"] + user_cols]
+
     st.subheader(f"👤 {sel_name} さん {sel_month} 【通所日報】（{len(display_user_df)} 件）")
     gb = GridOptionsBuilder.from_dataframe(display_user_df)
-    gb.configure_default_column(wrapText=True, autoHeight=True)
+    gb.configure_default_column(
+        tooltipField="__colName__",
+        wrapText=True,
+        autoHeight=True,
+        cellStyle={'whiteSpace': 'normal'}
+    )
     gb.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
     gb.configure_column("Name", header_name="名前", pinned="left")
+    for col in user_cols:
+        gb.configure_column(col, header_name=header_map.get(col, col))
     AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
-# ===== 利用者分析 =====
+    # ===== 退所日報 =====
+    user_exit_df = df_exit[(df_exit["Name"] == sel_name) & (df_exit["YearMonth"] == sel_month)].sort_values("Timestamp")
+    display_exit_df = user_exit_df.drop(
+        columns=["Timestamp", "Email", "Date", "YearMonth"],
+        errors="ignore"
+    )
+
+    # カラム順: Timestamp_str → Name → 残り
+    exit_cols = display_exit_df.columns.tolist()
+    exit_cols = [c for c in exit_cols if c not in ["Timestamp_str", "Name"]]
+    display_exit_df = display_exit_df[["Timestamp_str", "Name"] + exit_cols]
+
+    st.subheader(f"👤 {sel_name} {sel_month} 【退所日報】（{len(display_exit_df)} 件）")
+    gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
+    gb_exit.configure_default_column(wrapText=True, autoHeight=True)
+    gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
+    gb_exit.configure_column("Name", header_name="名前", pinned="left")
+    AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=600)
+
 else:
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("分析対象", names)
     person_df = df[df["Name"] == sel_name].copy()
+
     st.subheader(f"📊 {sel_name} の分析")
 
-    st.markdown("### 📅 月ごとの通所回数")
+    st.markdown("### 月ごとの通所回数")
     st.bar_chart(person_df.groupby("YearMonth").size())
 
-    st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
+    st.markdown("### 月ごとの起床・就寝時間 平均とばらつき")
+
+    # 起床・就寝を秒化
     valid = person_df.dropna(subset=["起床時間_dt", "就寝時間_dt"]).copy()
     valid["wakeup_sec"] = valid["起床時間_dt"].dt.hour * 3600 + valid["起床時間_dt"].dt.minute * 60
     valid["bed_sec_raw"] = valid["就寝時間_dt"].dt.hour * 3600 + valid["就寝時間_dt"].dt.minute * 60
+
+    # 補正
     def adjust_bed(row):
         return row["bed_sec_raw"] if row["bed_sec_raw"] > row["wakeup_sec"] else row["bed_sec_raw"] + 86400
     valid["bed_sec"] = valid.apply(adjust_bed, axis=1)
+
+    # 月ごとに平均・標準偏差
     stat = valid.groupby("YearMonth").agg({
         "wakeup_sec": ["mean", "std"],
         "bed_sec": ["mean", "std"]
     }).reset_index()
     stat.columns = ["YearMonth", "WakeupMean", "WakeupStd", "BedMean", "BedStd"]
+
     def sec2hm(s):
         s = s % 86400
         h = int(s // 3600)
         m = int((s % 3600) // 60)
         return f"{h:02}:{m:02}"
+
     stat["WakeupMeanHM"] = stat["WakeupMean"].apply(sec2hm)
     stat["BedMeanHM"] = stat["BedMean"].apply(sec2hm)
     stat["WakeupStdMin"] = stat["WakeupStd"] / 60
     stat["BedStdMin"] = stat["BedStd"] / 60
+
     st.dataframe(stat[[
-        "YearMonth", "WakeupMeanHM", "WakeupStdMin",
+        "YearMonth",
+        "WakeupMeanHM", "WakeupStdMin",
         "BedMeanHM", "BedStdMin"
     ]].rename(columns={
         "WakeupMeanHM": "起床平均",
@@ -206,22 +273,26 @@ else:
         "BedStdMin": "就寝ばらつき(分)"
     }))
 
+    # 除外ワード（完全一致で除く）
     exclude_words = [
         "なし", "なし。", "とくになし", "特になし", "特になし。",
         "ありません", "特にありません", "特にありません。", "ありません。", "ございません"
     ]
+
+    # 前後空白だけ strip で除去して小文字化
     def clean_text_no_re(s):
         if not isinstance(s, str):
             return ""
         return s.strip().replace("　", "").lower()
-    st.markdown("### 📌 相談・連絡（フォーム）")
+
+    # 📌 相談・連絡（通所）
     contact_df = person_df[
         person_df["相談・連絡"].notna()
         & ~person_df["相談・連絡"].apply(clean_text_no_re).isin(exclude_words)
     ]
     st.dataframe(contact_df[["Date", "相談・連絡"]])
 
-    st.markdown("### 🗂 その他（退所）")
+    # 🗂 その他（退所）
     contact_exit_df = df_exit[
         (df_exit["Name"] == sel_name)
         & df_exit["その他"].notna()
@@ -229,18 +300,32 @@ else:
     ]
     st.dataframe(contact_exit_df[["Date", "その他"]])
 
-    st.markdown("### ☁️ 目標・課題 WordCloud")
+    st.markdown("### 目標・課題 WordCloud")
     texts = (
         person_df["今日の目標"].dropna().tolist()
         + person_df["課題の対処はどうしますか？"].dropna().tolist()
     )
-    texts = [t for t in texts if str(t).strip() and str(t).strip() not in exclude_words]
+    # 除外したい完全一致のパターン
+    exclude_words = [
+        "なし", "なし。", "とくになし", "特になし", "特になし。",
+        "ありません", "特にありません。",  "ありません。", "ございません"
+        ]
+    # 前後空白・改行を正規化し、小文字化して比較
+    def clean_text(s):
+        if not isinstance(s, str):
+            return ""
+        return re.sub(r"\s+", "", s.strip()).lower()
+    texts = [
+        t for t in texts
+        if str(t).strip() and str(t).strip() not in exclude_words
+    ]
     text_all = " ".join(texts)
     if text_all.strip():
         wc = WordCloud(
             background_color="white",
             font_path="./fonts/NotoSansJP-Regular.ttf",
-            width=800, height=400
+            width=800,
+            height=400
         ).generate(text_all)
         fig, ax = plt.subplots()
         ax.imshow(wc, interpolation="bilinear")
@@ -248,29 +333,3 @@ else:
         st.pyplot(fig)
     else:
         st.info("テキストが不足しています（すべて『なし』か空です）。")
-
-    st.markdown("### ✅ 正規化データによる出席状況")
-    person_att = df_attendance[df_attendance['氏名'] == sel_name].copy()
-    present_count = person_att[person_att['出席状況'] == '出席'].shape[0]
-    absent_count = person_att[person_att['出席状況'] == '欠席'].shape[0]
-    total_days = present_count + absent_count
-    attendance_rate = round((present_count / total_days * 100), 1) if total_days > 0 else 0
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("出席日数", f"{present_count} 日")
-    col2.metric("欠席日数", f"{absent_count} 日")
-    col3.metric("対象日数", f"{total_days} 日")
-    col4.metric("出席率", f"{attendance_rate} %")
-
-    st.markdown("### 📅 月別 出席数（正規化データ）")
-    month_summary = (
-        person_att.groupby(['YearMonth', '出席状況'])
-        .size()
-        .reset_index(name='件数')
-    )
-    chart = alt.Chart(month_summary).mark_bar().encode(
-        x=alt.X('YearMonth:N', title='年月'),
-        y=alt.Y('件数:Q'),
-        color=alt.Color('出席状況:N'),
-        tooltip=['YearMonth', '出席状況', '件数']
-    ).properties(width=700, height=400)
-    st.altair_chart(chart, use_container_width=True)
