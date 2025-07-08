@@ -261,11 +261,14 @@ else:
         lambda row: round(row['present'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
         axis=1
     )
-    st.dataframe(month_totals.rename(columns={
-        'YearMonth': '年月',
-        'present': '出席',
-        'absent': '欠席'
-    })[['年月', 'present', 'absent', '対象日数', '出席率(%)']])
+    st.dataframe(
+        month_totals.rename(columns={
+            'YearMonth': '年月',
+            'present': '出席',
+            'absent': '欠席'
+        })[['年月', '出席', '欠席', '対象日数', '出席率(%)']]
+    )
+
 
 
     st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
