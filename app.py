@@ -195,7 +195,6 @@ else:
     col3.metric("対象日数", f"{total_days} 日")
     col4.metric("出席率", f"{attendance_rate} %")
 
-    st.markdown("### 📅 月別 出席数・欠席数）")
     # 📅 月別の件数サマリ
     month_summary = (
         person_att[person_att['カウント区分'] != 'ignore']
@@ -216,15 +215,27 @@ else:
         axis=1
     )
 
-    st.markdown("### 📅 月別 出席数・欠席数と出席率 (二重軸)")
+    st.markdown("### 📅 月別の出欠席数と出席率")
 
     # Altair: 棒グラフ (出席・欠席)
     bars = alt.Chart(month_summary).mark_bar().encode(
         x=alt.X('YearMonth:N', title='年月', axis=alt.Axis(labelAngle=0)),
         y=alt.Y('件数:Q', title='件数'),
-        color=alt.Color('カウント区分:N', title='区分'),
+        color=alt.Color(
+            'カウント区分:N',
+            title='出席区分',
+            scale=alt.Scale(
+                domain=['present', 'absent'],
+                range=['#1f77b4', '#ff7f0e'],  # 任意の色
+            ),
+            legend=alt.Legend(
+                title="区分",
+                labelExpr="datum.label == 'present' ? '出席' : datum.label == 'absent' ? '欠席' : datum.label"
+            )
+        ),
         tooltip=['YearMonth', 'カウント区分', '件数']
     )
+
 
     # Altair: 折れ線グラフ (出席率)
     line = alt.Chart(month_totals).mark_line(point=True, color='black').encode(
@@ -244,22 +255,18 @@ else:
     st.altair_chart(combined, use_container_width=True)
 
 
-    # 月別の出席率も表で出す
-    month_totals = (
-        month_summary.groupby(['YearMonth', 'カウント区分'])['件数'].sum().unstack(fill_value=0)
-    ).reset_index()
-
-    month_totals['対象日数'] = month_totals.get('present', 0) + month_totals.get('absent', 0)
+    # Altair 用に作った pivot をそのまま流用
+    st.markdown("### 📅 月別の出欠席数・出席率")
     month_totals['出席率(%)'] = month_totals.apply(
         lambda row: round(row['present'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
         axis=1
     )
-
     st.dataframe(month_totals.rename(columns={
         'YearMonth': '年月',
-        '出席': '出席',
-        '欠席': '欠席'
-    }))
+        'present': '出席',
+        'absent': '欠席'
+    })[['年月', 'present', 'absent', '対象日数', '出席率(%)']])
+
 
     st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
     valid = person_df.dropna(subset=["起床時間_dt", "就寝時間_dt"]).copy()
