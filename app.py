@@ -203,15 +203,21 @@ else:
         .reset_index(name='件数')
     )
 
+    # ✅ 英語 → 日本語
+    month_summary['区分_表示'] = month_summary['カウント区分'].map({
+        'present': '出席',
+        'absent': '欠席'
+    })
+
     # 📅 月別の件数 Pivot → 出席率計算
     month_totals = (
-        month_summary.pivot_table(index='YearMonth', columns='カウント区分', values='件数', fill_value=0)
+        month_summary.pivot_table(index='YearMonth', columns='区分_表示', values='件数', fill_value=0)
         .reset_index()
     )
 
-    month_totals['対象日数'] = month_totals.get('present', 0) + month_totals.get('absent', 0)
+    month_totals['対象日数'] = month_totals.get('出席', 0) + month_totals.get('欠席', 0)
     month_totals['出席率'] = month_totals.apply(
-        lambda row: round(row['present'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
+        lambda row: round(row['出席'] / row['対象日数'] * 100, 1) if row['対象日数'] > 0 else 0,
         axis=1
     )
 
@@ -222,20 +228,15 @@ else:
         x=alt.X('YearMonth:N', title='年月', axis=alt.Axis(labelAngle=0)),
         y=alt.Y('件数:Q', title='件数'),
         color=alt.Color(
-            'カウント区分:N',
+            '区分_表示:N',
             title='出席区分',
             scale=alt.Scale(
-                domain=['present', 'absent'],
-                range=['#1f77b4', '#ff7f0e'],  # 任意の色
-            ),
-            legend=alt.Legend(
-                title="区分",
-                labelExpr="datum.label == 'present' ? '出席' : datum.label == 'absent' ? '欠席' : datum.label"
+                domain=['出席', '欠席'],
+                range=['#1f77b4', '#ff7f0e'],
             )
         ),
-        tooltip=['YearMonth', 'カウント区分', '件数']
+        tooltip=['YearMonth', '区分_表示', '件数']
     )
-
 
     # Altair: 折れ線グラフ (出席率)
     line = alt.Chart(month_totals).mark_line(point=True, color='black').encode(
@@ -262,14 +263,8 @@ else:
         axis=1
     )
     st.dataframe(
-        month_totals.rename(columns={
-            'YearMonth': '年月',
-            'present': '出席',
-            'absent': '欠席'
-        })[['年月', '出席', '欠席', '対象日数', '出席率(%)']]
+        month_totals[['YearMonth', '出席', '欠席', '対象日数', '出席率']]
     )
-
-
 
     st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
     valid = person_df.dropna(subset=["起床時間_dt", "就寝時間_dt"]).copy()
