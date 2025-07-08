@@ -158,6 +158,23 @@ elif mode == "👤 利用者別（月別）":
     gb.configure_column("Name", header_name="名前", pinned="left")
     AgGrid(display_user_df, gridOptions=gb.build(), height=600)
 
+    # === 退所日報 ===
+    exit_user_df = df_exit[
+        (df_exit["Name"] == sel_name) &
+        (df_exit["YearMonth"] == sel_month)
+    ].sort_values("Timestamp")
+
+    # 不要列除去
+    display_exit_df = exit_user_df.drop(columns=["Timestamp", "Email", "Date", "YearMonth"], errors="ignore")
+
+    st.subheader(f"👤 {sel_name} さん {sel_month} 【退所日報】（{len(display_exit_df)} 件）")
+    gb_exit = GridOptionsBuilder.from_dataframe(display_exit_df)
+    gb_exit.configure_default_column(wrapText=True, autoHeight=True)
+    gb_exit.configure_column("Timestamp_str", header_name="Timestamp", pinned="left")
+    gb_exit.configure_column("Name", header_name="名前", pinned="left")
+    AgGrid(display_exit_df, gridOptions=gb_exit.build(), height=400)
+
+
 else:
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("分析対象", names)
