@@ -23,9 +23,9 @@ credentials = Credentials.from_service_account_info(
 client = gspread.authorize(credentials)
 
 # ===== スプレッドシート URL =====
-sheet_url = "https://docs.google.com/spreadsheets/d/【通所シートID】/edit"
-sheet_url_exit = "https://docs.google.com/spreadsheets/d/【退所シートID】/edit"
-sheet_url_attendance = "https://docs.google.com/spreadsheets/d/【正規化シートID】/edit"
+sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
+sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
+sheet_url_attendance = "https://docs.google.com/spreadsheets/d/1rYV8BsSpyuuBT_KVZR-f0MKbMWQi65lddDQEe_eImuk/edit"
 
 spreadsheet = client.open_by_url(sheet_url)
 spreadsheet_exit = client.open_by_url(sheet_url_exit)
