@@ -8,35 +8,6 @@ import matplotlib.pyplot as plt
 import altair as alt
 import pytz
 from datetime import datetime
-
-# ===== ページ設定 =====
-st.set_page_config(page_title="通所・退所日報ダッシュボード", layout="wide")
-st.title("📝 通所・退所日報ダッシュボード")
-
-# ===== Google 認証 =====
-scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-credentials = Credentials.from_service_account_info(
-    st.secrets["connections"]["gsheets"],
-    scopes=scope
-)
-client = gspread.authorize(credentials)
-
-# ===== スプレッドシート読み込み =====
-
-sheet_url = "https://docs.google.com/spreadsheets/d/1v4rNnnwxUcSN_O2QjZhHowVGyVclrWlYo8w8yRdd89w/edit"
-sheet_url_exit = "https://docs.google.com/spreadsheets/d/11TMeEch6jzvJBOdjyGYkCRfG6ltWHxM8XK4BZSLCnKM/edit"
-sheet_url_attendance = "https://docs.google.com/spreadsheets/d/1rYV8BsSpyuuBT_KVZR-f0MKbMWQi65lddDQEe_eImuk/edit"
-
-import streamlit as st
-import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
-from st_aggrid import AgGrid, GridOptionsBuilder
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-import altair as alt
-import pytz
-from datetime import datetime
 import re
 
 # ===== ページ設定 =====
