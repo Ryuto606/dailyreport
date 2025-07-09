@@ -285,7 +285,7 @@ else:
     )
 
 
-    st.markdown("### 🕒 月ごとの起床・就寝時間 平均とばらつき")
+    st.markdown("### 🕒 月ごとの起床・就寝時間（平均とばらつき）")
     valid = person_df.dropna(subset=["起床時間_dt", "就寝時間_dt"]).copy()
     valid["wakeup_sec"] = valid["起床時間_dt"].dt.hour * 3600 + valid["起床時間_dt"].dt.minute * 60
     valid["bed_sec_raw"] = valid["就寝時間_dt"].dt.hour * 3600 + valid["就寝時間_dt"].dt.minute * 60
@@ -324,14 +324,14 @@ else:
         if not isinstance(s, str):
             return ""
         return s.strip().replace("　", "").lower()
-    st.markdown("### 📌 相談・連絡（フォーム）")
+    st.markdown("### 📌 相談・連絡（通所日報）")
     contact_df = person_df[
         person_df["相談・連絡"].notna()
         & ~person_df["相談・連絡"].apply(clean_text_no_re).isin(exclude_words)
     ]
     st.dataframe(contact_df[["Date", "相談・連絡"]])
 
-    st.markdown("### 🗂 その他（退所）")
+    st.markdown("### 🗂 その他（退所日報）")
     contact_exit_df = df_exit[
         (df_exit["Name"] == sel_name)
         & df_exit["その他"].notna()
@@ -339,7 +339,7 @@ else:
     ]
     st.dataframe(contact_exit_df[["Date", "その他"]])
 
-    st.markdown("### ☁️ 目標・課題 WordCloud")
+    st.markdown("### ☁️ 目標・課題（WordCloud）")
     texts = (
         person_df["今日の目標"].dropna().tolist()
         + person_df["課題の対処はどうしますか？"].dropna().tolist()
