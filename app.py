@@ -331,7 +331,7 @@ else:
     ]
     st.dataframe(contact_df[["Date", "相談・連絡"]])
 
-    st.markdown("### 🗂 その他（退所日報）")
+    st.markdown("### 📌 その他（退所日報）")
     contact_exit_df = df_exit[
         (df_exit["Name"] == sel_name)
         & df_exit["その他"].notna()
