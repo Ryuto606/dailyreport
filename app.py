@@ -179,7 +179,7 @@ else:
     names = sorted(df["Name"].dropna().unique())
     sel_name = st.selectbox("分析対象", names)
     person_df = df[df["Name"] == sel_name].copy()
-    st.subheader(f"📊 {sel_name} の分析")
+    st.subheader(f"📊 {sel_name} さんの分析")
 
     st.markdown("### ✅ 出席状況")
 
