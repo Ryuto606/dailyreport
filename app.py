@@ -106,6 +106,9 @@ header_map = {
     "オフタイムコントロール [睡眠]": "睡眠",
     "オフタイムコントロール [食事]": "食事",
     "オフタイムコントロール [ストレス]": "ストレス",
+    "今日の自分の状態の課題は？": "課題",
+    "課題の原因はなんですか？": "課題の原因",
+    "課題の対処はどうしますか？": "課題の対処"
 }
 
 mode = st.radio(
@@ -283,6 +286,22 @@ else:
     st.dataframe(
         month_totals[['YearMonth', '出席', '欠席', '対象日数', '出席率']]
     )
+
+    st.markdown("### 📅 曜日別出席率")
+
+    # 曜日ごとの件数集計
+    weekday_stats = (
+        df[df["Name"] == sel_name]
+        .groupby(["曜日"])
+        .size()
+        .reset_index(name="出席回数")
+        .sort_values("曜日")  # 曜日順にソート（任意）
+    )
+
+    st.dataframe(weekday_stats)
+
+    # オプションで棒グラフ
+    st.bar_chart(data=weekday_stats.set_index("曜日"))
 
 
     st.markdown("### 🕒 月ごとの起床・就寝時間（平均とばらつき）")
